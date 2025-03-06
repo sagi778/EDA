@@ -1,0 +1,8 @@
+{
+    "Preview":[
+        "get_shape(df=df,output_type='table')",
+        "get_preview(df=df,rows=5,end='head',output_type='table')"
+    ]
+}
+    
+    

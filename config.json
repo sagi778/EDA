@@ -1,0 +1,49 @@
+{
+    "CodeLine":{
+        "font": "14px Consolas",
+        "color": "#919191",
+        "background-color": "#f4f4f4",
+        "border": "2px solid #dedede",
+        "border-radius": "5px",
+        "focus": {
+            "color":"#4e4e4e",
+            "background-color": "white",
+            "border-color": "#dedede"
+        }
+    },
+    "FileExplorer":{
+        "background-color": "white",
+        "selection-color": "#a9cce3",
+        "font": "13px Consolas",
+        "color": "#34495e"
+    },
+    "DataViewer":{
+        "border":"2px solid #dedede",
+        "hover-color":"#f4f4f4",
+        "selected-tab-color":"white",
+        "unselected-tab-color":"#616a6b"
+    },
+    "Table":{
+        "alt-row-color":"#f4f4f4",
+        "font":"14px Consolas",
+        "color":"#616a6b"
+    },
+    "Controls":{
+        "background-color":"white",
+        "border":"1px solid #f4f4f4",
+        "hover-color":"#f4f4f4",
+        "hover-border":"2px solid #dedede",
+        "border-radius":"15px"
+    },
+    "arguments":{
+        "font": "13px Consolas",
+        "color": "#919191"
+    },
+    "Output":{
+        "font": "12px Consolas",
+        "color": "#616a6b",
+        "table":{
+            "background-color":"#f4f4f4"
+        }
+    }
+}
