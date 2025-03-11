@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QVBoxLayout,QHBoxLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame
 from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea
 
-from PyQt5.QtGui import QColor,QIcon
+from PyQt5.QtGui import QColor,QIcon,QPixmap
 from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize
 import sys
 from func import *
@@ -111,6 +111,8 @@ class CodeControls(QWidget):
         super().__init__()
         self.setObjectName("CodeControls")
 
+        ICON_SIZE = 32
+
         left_layout = QHBoxLayout()
         left_layout.setAlignment(Qt.AlignLeft)
         left_layout.setSpacing(1)
@@ -138,38 +140,43 @@ class CodeControls(QWidget):
                 border-color: {CONFIG["Controls"]["hover-color"]}
             }}
         """
-        # left buttons    
-
+        # left side buttons    
         self.up = QPushButton('', self)
         self.up.setIcon(QIcon(f'{CURRENT_PATH}/icons/arrow-up.png'))
         self.up.setStyleSheet(BUTTON_STYLE)
-        self.up.clicked.connect(self.func1)
+        self.up.clicked.connect(self.set_up)
         left_layout.addWidget(self.up)
 
         self.down = QPushButton('', self)
         self.down.setIcon(QIcon(f'{CURRENT_PATH}/icons/arrow-down.png'))
         self.down.setStyleSheet(BUTTON_STYLE)
-        self.down.clicked.connect(self.func1)
+        self.down.clicked.connect(self.set_down)
         left_layout.addWidget(self.down)
 
         self.add = QPushButton('', self)
         self.add.setIcon(QIcon(f'{CURRENT_PATH}/icons/add.png'))
         self.add.setStyleSheet(BUTTON_STYLE)
-        self.add.clicked.connect(self.func1)
+        self.add.clicked.connect(self.set_add)
         left_layout.addWidget(self.add)
 
-        # right buttons
+        # right side buttons
         self.pin = QPushButton('', self)
-        self.pin.setIcon(QIcon(f'{CURRENT_PATH}/icons/pin.png'))
+        self.pin.setIcon(QIcon(f'{CURRENT_PATH}/icons/thumbtack.png'))
         self.pin.setStyleSheet(BUTTON_STYLE)
-        self.pin.clicked.connect(self.func1)
+        self.pin.clicked.connect(self.set_pin)
         right_layout.addWidget(self.pin)
 
         self.trash = QPushButton('', self)
         self.trash.setIcon(QIcon(f'{CURRENT_PATH}/icons/trash.png'))
         self.trash.setStyleSheet(BUTTON_STYLE)
-        self.trash.clicked.connect(self.func1)
+        self.trash.clicked.connect(self.set_delete)
         right_layout.addWidget(self.trash)
+
+        self.save = QPushButton('', self)
+        self.save.setIcon(QIcon(f'{CURRENT_PATH}/icons/save.png'))
+        self.save.setStyleSheet(BUTTON_STYLE)
+        self.save.clicked.connect(self.set_save)
+        right_layout.addWidget(self.save)
 
         self.fold = QPushButton('', self)
         self.fold.setIcon(QIcon(f'{CURRENT_PATH}/icons/fold.png'))
@@ -179,6 +186,45 @@ class CodeControls(QWidget):
 
         self.setLayout(layout)
 
+    def set_pin(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        layout.removeWidget(current_cmd_block)
+        layout.insertWidget(0,current_cmd_block)
+    def set_up(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        if current_index > 0:
+            layout.removeWidget(current_cmd_block)
+            layout.insertWidget(current_index - 1, current_cmd_block)
+    def set_down(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        if current_index < layout.count() - 1:
+            layout.removeWidget(current_cmd_block)
+            layout.insertWidget(current_index + 1, current_cmd_block)
+    def set_add(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        layout.insertWidget(current_index + 1, CommandBlock(cmd=current_cmd_block._cmd))        
+    def set_delete(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        layout.removeWidget(current_cmd_block)
+        current_cmd_block.deleteLater()
+    def set_save(self): 
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        data_viewer = current_cmd_block.parent().parent().parent().parent().parent().parent()
+        story_layout = data_viewer.story_tab_layout
+        story_layout.addWidget(current_cmd_block)
+        story_layout.update()
+        layout.update()
+
     def func1(self):
         print("Function 1 executed")    
 class ArgsMenu(QWidget):
@@ -187,6 +233,7 @@ class ArgsMenu(QWidget):
         self.setObjectName("ArgsMenu")
 
         self._args = {}
+        MAX_ARG_WIDTH = 220
 
         self.layout = QHBoxLayout()
         self.layout.setContentsMargins(0,0,10,0)
@@ -198,15 +245,15 @@ class ArgsMenu(QWidget):
                 combo = QComboBox()
                 combo.addItems(arg['options'])
                 combo.setCurrentIndex(0)  # Set default selection
-                combo.setFixedWidth(20 + max([12*len(str(item)) for item in arg['options']]))
+                combo.setFixedWidth(min(MAX_ARG_WIDTH,20 + max([12*len(str(item)) for item in arg['options']])))
                 combo.setStyleSheet(
                     "QComboBox { "
                     f"font: {CONFIG['arguments']['font']}; "
                     "color: purple;"
                     "padding: 1px 1px; "
-                    "border: 2px solid #dedede; "
+                    "border: 1px solid #dedede; "
                     "border-radius: 5px; "
-                    f"background-color: {CONFIG['CodeLine']['background-color']}; "
+                    f"background-color: #f9f0fa; "
                     "selection-background-color: #dedede; "
                     "}"
                     "QComboBox::down-arrow {"
@@ -223,16 +270,16 @@ class ArgsMenu(QWidget):
             elif arg['type'] == 'int':    
                 int_arg = QLineEdit()
                 int_arg.setText(str(arg['default']))  # Set default text
-                int_arg.setFixedWidth(max([12*len(str(item)) for item in arg['options']]))
+                int_arg.setFixedWidth(min(MAX_ARG_WIDTH,max([12*len(str(item)) for item in arg['options']])))
                 int_arg.setStyleSheet(
                     "QLineEdit { "
                     f"font: {CONFIG['arguments']['font']}; "
                     "color: green;"
                     "padding: 1px 1px; "
-                    "border: 2px solid #dedede; "
+                    "border: 1px solid #dedede; "
                     "border-radius: 5px; "
-                    f"background-color: {CONFIG['CodeLine']['background-color']}; "
-                    "selection-background-color: #dedede; "
+                    f"background-color: #f0faf7; "
+                    "selection-background-color: #eafaf1; "
                     "}"
                 )
                 int_arg.textChanged.connect(self.update_command)
@@ -326,10 +373,10 @@ class CommandBlock(QWidget):
         self.setLayout(main_layout)
     
     def get_attributes(self):
-        return {'self._cmd':f"{self._cmd}",'self._args':f"{self._args}",'self._output':f"{self._output}"}
+        return {'self._cmd':f"{self._cmd}",'self._args':f"{self._args}",'self._output':f"{self._output}"}    
     def run_command(self):
         def delete_prev_output(self):
-            for item_type in [ArgsMenu,TextOutput,TableOutput]:
+            for item_type in [ArgsMenu,TextOutput,TableOutput,ChartOutput,PlotOutput]:
                 try:
                     output_widget = self.findChild(item_type)
                     output_widget.setParent(None)
@@ -340,22 +387,22 @@ class CommandBlock(QWidget):
         #print("command block run command") # monitor
         #print(f"current att: {self.get_attributes()}") # monitor
         delete_prev_output(self)
-        
-        try:
-            df = DATA_TABLE['df']
-            output_obj = eval(self._cmd)
 
-            self._args = ArgsMenu(output_obj['args'])
-            self.layout.addWidget(self._args)
+        df = DATA_TABLE['df']
+        output_obj = eval(self._cmd)
 
-            if output_obj['output_type'] == 'text':
-                self._output = TextOutput(output_obj['output'])
-            elif output_obj['output_type'] == 'table':
-                self._output = TableOutput(output_obj['output'])
-        except Exception as e:
-            self._output = TextOutput(f"[!] {e}")
-            print(f"[!] {e}")
-          
+        self._args = ArgsMenu(output_obj['args'])
+        self.layout.addWidget(self._args)
+
+        if output_obj['output_type'] == 'text':
+            self._output = TextOutput(output_obj['output'])
+        elif output_obj['output_type'] == 'table':
+            self._output = TableOutput(output_obj['output'])
+        elif output_obj['output_type'] == 'plot':  
+            self._output = PlotOutput(output_obj['output'])      
+        elif output_obj['output_type'] == 'chart':  
+            self._output = ChartOutput(output_obj['output'])  
+
         self.block.setFixedHeight(self._output._rows)
         self.layout.addWidget(self._output)
     
@@ -372,76 +419,16 @@ class DataViewer(QWidget):
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{ 
                 border: none; 
-                border-radius: 5px;
+                border-radius: 15px;
             }}
             QTabBar::tab {{ 
                 background: none; 
-                padding: 8px; 
+                padding: 1px; 
                 font: 13px Consolas;
                 color: {CONFIG['DataViewer']['unselected-tab-color']};
                 border: {CONFIG['DataViewer']['border']};
-                border-radius: 5px; 
-                margin: 2px; 
-            }}
-            QTabBar::tab:selected {{ 
-                background: {CONFIG['DataViewer']['selected-tab-color']}; 
-                font: 14px Consolas;
-                color: {CONFIG['FileExplorer']['color']}; 
-                font-weight: bold; 
-            }}
-            QTabBar::tab:hover {{
-                color: {CONFIG['FileExplorer']['color']}; 
-                background-color: {CONFIG['DataViewer']['hover-color']};
-            }}
-        """)
-        self.tabs.setIconSize(QSize(35,35))  # Set tab icon size
-        
-        # Create individual tabs
-        self.preview_tab = QWidget()
-        self.preview_tab_layout = QVBoxLayout()
-        self.preview_tab_layout.setAlignment(Qt.AlignTop)
-        self.preview_tab_layout.setSpacing(1)
-        self.preview_tab.setLayout(self.preview_tab_layout)
-        self.tabs.addTab(self.preview_tab, QIcon(f'{CURRENT_PATH}/icons/view.png'), "Preview")
-        
-        self.analysis_tab = QWidget()
-        self.analysis_tab_layout = QVBoxLayout()
-        self.analysis_tab_layout.setAlignment(Qt.AlignTop)
-        self.analysis_tab_layout.setSpacing(1)
-        self.analysis_tab_layout.addWidget(QLabel("Content for Analysis"))
-        self.analysis_tab.setLayout(self.analysis_tab_layout)
-        self.tabs.addTab(self.analysis_tab, QIcon(f'{CURRENT_PATH}/icons/statistics.png'), "Analysis")
-        
-        layout.addWidget(self.tabs)
-        self.setLayout(layout)
-        self.resize(400, 300)    
-
-    def set_preview(self):
-        print('[>] Setting up preview commands')
-        for cmd_string in COMMANDS['Preview']:
-            self.preview_tab_layout.addWidget(CommandBlock(cmd=cmd_string))
-class DataViewer(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setObjectName("DataViewer")
-
-        layout = QVBoxLayout()
-        
-        # Create tab widget
-        self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(f"""
-            QTabWidget::pane {{ 
-                border: none; 
-                border-radius: 5px;
-            }}
-            QTabBar::tab {{ 
-                background: none; 
-                padding: 8px; 
-                font: 13px Consolas;
-                color: {CONFIG['DataViewer']['unselected-tab-color']};
-                border: {CONFIG['DataViewer']['border']};
-                border-radius: 5px; 
-                margin: 2px; 
+                border-radius: 10px; 
+                margin: 1px; 
             }}
             QTabBar::tab:selected {{ 
                 background: {CONFIG['DataViewer']['selected-tab-color']}; 
@@ -454,24 +441,31 @@ class DataViewer(QWidget):
                 background-color: {CONFIG['DataViewer']['hover-color']};
             }}
             QScrollArea {{
-                border: 0px solid {CONFIG['DataViewer']['border']};
-                border-radius: 5px;
+                border: none;
                 background: none;
             }}
             QScrollBar:vertical {{
-                border: 1px solid black;
-                background: none;
-                width: 18px;
-                margin: 2px;
+                border: none;
+                background: none; 
+                width: 15px; /* Scrollbar width */
+                margin: 0px;
+                border-radius: 0px;
             }}
             QScrollBar::handle:vertical {{
-                background: {CONFIG['CodeLine']['color']};
-                border-radius: 4px;
+                background: white; 
+                min-height: 20px;
+                border-radius: 2px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {CONFIG['CodeLine']['color']}; /* Darker on hover */
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                background: none; /* Hide arrows */
             }}
         """)
-        self.tabs.setIconSize(QSize(35,35))  # Set tab icon size
+        self.tabs.setIconSize(QSize(45,45))  # Set tab icon size
         
-        # Create individual tabs with scroll areas
+        # Preview
         self.preview_tab = QWidget()
         self.preview_scroll = QScrollArea()
         self.preview_scroll.setWidgetResizable(True)
@@ -483,8 +477,23 @@ class DataViewer(QWidget):
         self.preview_tab_layout.setSpacing(1)
         self.preview_container.setLayout(self.preview_tab_layout)
         self.preview_scroll.setWidget(self.preview_container)
-        self.tabs.addTab(self.preview_scroll, QIcon(f'{CURRENT_PATH}/icons/view.png'), "Preview")
+        self.tabs.addTab(self.preview_scroll, QIcon(f'{CURRENT_PATH}/icons/preview.png'), "Preview")
+
+        # Plots
+        self.plots_tab = QWidget()
+        self.plots_scroll = QScrollArea()
+        self.plots_scroll.setWidgetResizable(True)
+        self.plots_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.plots_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.plots_container = QWidget()
+        self.plots_tab_layout = QVBoxLayout()
+        self.plots_tab_layout.setAlignment(Qt.AlignTop)
+        self.plots_tab_layout.setSpacing(1)
+        self.plots_container.setLayout(self.plots_tab_layout)
+        self.plots_scroll.setWidget(self.plots_container)
+        self.tabs.addTab(self.plots_scroll, QIcon(f'{CURRENT_PATH}/icons/chart.png'), "Plots")
         
+        # Analysis
         self.analysis_tab = QWidget()
         self.analysis_scroll = QScrollArea()
         self.analysis_scroll.setWidgetResizable(True)
@@ -498,15 +507,38 @@ class DataViewer(QWidget):
         self.analysis_container.setLayout(self.analysis_tab_layout)
         self.analysis_scroll.setWidget(self.analysis_container)
         self.tabs.addTab(self.analysis_scroll, QIcon(f'{CURRENT_PATH}/icons/statistics.png'), "Analysis")
+
+        # Story
+        self.story_tab = QWidget()
+        self.story_scroll = QScrollArea()
+        self.story_scroll.setWidgetResizable(True)
+        self.story_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.story_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.story_container = QWidget()
+        self.story_tab_layout = QVBoxLayout()
+        self.story_tab_layout.setAlignment(Qt.AlignTop)
+        self.story_tab_layout.setSpacing(1)
+        self.story_tab_layout.addWidget(QLabel("Story"))
+        self.story_container.setLayout(self.story_tab_layout)
+        self.story_scroll.setWidget(self.story_container)
+        self.tabs.addTab(self.story_scroll, QIcon(f'{CURRENT_PATH}/icons/story.png'), "Story")
         
         layout.addWidget(self.tabs)
         self.setLayout(layout)
-        self.resize(400, 300)    
+        #self.resize(400, 300)    
 
     def set_preview(self):
         print('[>] Setting up preview commands')
         for cmd_string in COMMANDS['Preview']:
             self.preview_tab_layout.addWidget(CommandBlock(cmd=cmd_string))
+    def set_plots(self):
+        print('[>] Setting up plots commands')
+        for cmd_string in COMMANDS['Plots']:
+            self.plots_tab_layout.addWidget(CommandBlock(cmd=cmd_string))          
+    def set_analysis(self):
+        print('[>] Setting up analysis commands')
+        for cmd_string in COMMANDS['Analysis']:
+            self.analysis_tab_layout.addWidget(CommandBlock(cmd=cmd_string))        
 
 # file explorer
 class FileExplorer(QWidget):
@@ -639,6 +671,8 @@ class FileExplorer(QWidget):
         def load_file_to_data_viewer(self):
             data_viewer = self.parent().parent().parent().findChild(DataViewer,None,Qt.FindChildrenRecursively) # find data_viewer
             data_viewer.set_preview()
+            data_viewer.set_analysis()
+            data_viewer.set_plots()
 
         self._selected_file = self.model.filePath(index) 
         self.path.setText(self._selected_file)
@@ -653,8 +687,42 @@ class FileExplorer(QWidget):
             load_file_to_data_viewer(self)
             
        
-
 # output widgets
+class PlotOutput(QWidget):
+    def __init__(self, fig=None, parent=None):
+        super().__init__(parent)
+
+        self._rows = 550 # height
+
+        self.setStyleSheet("background-color: white; border: 2px solid #333;")
+        #self.setFixedSize(400,400)
+        
+        self.layout = QVBoxLayout()
+        self.canvas = FigureCanvas(fig if fig else plt.figure())
+        self.layout.addWidget(self.canvas)
+        self.setLayout(self.layout)
+
+    def set_plot(self, fig):
+        self.canvas.figure = fig
+        self.canvas.draw()
+class ChartOutput(QWidget):
+    def __init__(self, fig=None, parent=None):
+        super().__init__(parent)
+
+        self._rows = 900 # height
+
+        self.setStyleSheet("background-color: #f0f0f0; border: 2px solid #333;")
+        self.setFixedSize(600, 400)
+        
+        self.layout = QVBoxLayout()
+        self.canvas = FigureCanvas(fig if fig else plt.figure())
+        self.layout.addWidget(self.canvas)
+        self.setLayout(self.layout)
+
+    def set_chart(self, fig):
+        """Update the widget with a new Seaborn/Matplotlib chart without saving as an image."""
+        self.canvas.figure = fig
+        self.canvas.draw()
 class TableOutput(QWidget):
     def __init__(self,df:pd.DataFrame=pd.DataFrame()):
         super().__init__()    
@@ -684,7 +752,7 @@ class TableOutput(QWidget):
             
             return styled_text
 
-        self._rows = 100 + 50*(1+len(df))
+        self._rows = min(max(200+20*len(df),320),800)
         self._df = df
         self._html_df = set_style(df.to_string(index=True))
         
@@ -695,7 +763,7 @@ class TableOutput(QWidget):
                 color: {CONFIG['Table']['color']};
                 background-color: white; 
                 white-space: pre;
-                padding: 1px 30px; 
+                padding: 1px 10px; 
                 border-radius: {CONFIG["Controls"]["border-radius"]};
                 border: 0px solid white;
             }}
@@ -762,7 +830,7 @@ class TextOutput(QWidget):
         super().__init__()    
 
         self._text = text
-        self._rows = 100 + 50*(1+len(text.split('\n')))
+        self._rows = min(max(200 + 20*len(text.split('\n')),320),800)
         self._width = min(800,100*max([len(row_str) for row_str in text.split('\n')]))
         
         #print(f"height = {self._rows}") # monitor

@@ -3,7 +3,7 @@
         "font": "14px Consolas",
         "color": "#919191",
         "background-color": "#f4f4f4",
-        "border": "2px solid #dedede",
+        "border": "1px solid #dedede",
         "border-radius": "5px",
         "focus": {
             "color":"#4e4e4e",
@@ -18,10 +18,20 @@
         "color": "#34495e"
     },
     "DataViewer":{
-        "border":"2px solid #dedede",
+        "border":"1px solid #dedede",
         "hover-color":"#f4f4f4",
         "selected-tab-color":"white",
         "unselected-tab-color":"#616a6b"
+    },
+    "Chart":{
+        "background":"#f4f4f4",
+        "data_colors":["#8fc7f1","#edba92","#d89fee","#59f989","#5dade2","#eb984e","#2ecc71","#e74c3c","#f4d03f","#a569bd"],
+        "frame_color":"#dedede",
+        "font":"Consolas",
+        "font_color":"#919191",
+        "font_size":9,
+        "mean_color":"#48B370",
+        "median_color":"#B03443"
     },
     "Table":{
         "alt-row-color":"#f4f4f4",

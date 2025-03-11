@@ -18,7 +18,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self.file_explorer)
         splitter.addWidget(self.data_viewer)
-        splitter.setSizes([500,1500])
+        splitter.setSizes([600,1500])
 
         self.data_viewer = QWidget()  
         splitter.addWidget(self.data_viewer)

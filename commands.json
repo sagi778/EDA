@@ -1,7 +1,16 @@
 {
     "Preview":[
         "get_shape(df=df,output_type='table')",
+        "get_columns_info(df=df,show='all',output_type='table')",
         "get_preview(df=df,rows=5,end='head',output_type='table')"
+    ],
+    "Plots":[
+        "get_scatter_plot(df=df,y=None,x=None,by=None)",
+        "get_box_plot(df=df,y=None,by=None)",
+        "get_count_plot(df=df,y=None,by=None,sub_category=None,stack=False)"
+    ],
+    "Analysis":[
+        "get_dist_plot(df=df,x='none',by='none',outliers='none')"
     ]
 }
     
