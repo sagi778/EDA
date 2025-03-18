@@ -1,5 +1,5 @@
 # Data_Explorer App
-simple & fast Data Exploration tool, 
+simple & fast Data Exploration tool,
 
 it allows you to explore data along many files.
 
