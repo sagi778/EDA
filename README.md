@@ -2,7 +2,7 @@
 
 Simple & fast Data Exploration tool,  
 it allows you to explore data along many files.  
-App is built on simple "Command blocks" - each block contain an analysis which is a peace in the puzzle.  
+App is built on simple "Command blocks" - each block contain an analysis which is a piece in the puzzle.  
 
 Exploring the data is conducted via CommandBlocks from the following Tabs:
 "Preview"/"Plots"/"Analysis".
