@@ -1,8 +1,9 @@
 # Data_Explorer App
 
-simple & fast Data Exploration tool,
-it allows you to explore data along many files.
-App is built on simple "Command blocks" - each block contain an analysis which is a peace in the puzzle.
+simple & fast Data Exploration tool,  
+it allows you to explore data along many files.  
+App is built on simple "Command blocks" - each block contain an analysis which is a peace in the puzzle.  
+
 
 # Preview blocks:
 ![get_preview](screenshots/get_preview.png)
