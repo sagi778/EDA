@@ -5,7 +5,7 @@ App is built on simple "Command blocks" - each block contain an analysis which i
 
 Exploring the data is conducted via CommandBlocks from the following Tabs:
 "Preview"/"Plots"/"Analysis".  
-![get_preview](screenshots/tabs.png)  
+![Tabs](screenshots/tabs.png)  
 "Story" Tab is empty & will contain only saved CommandBlocks - it is used for presenting the final result.  
 
   
