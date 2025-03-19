@@ -6,7 +6,7 @@ class MainWindow(QMainWindow):
 
         # Set up the main window layout
         self.setWindowTitle('Data Explorer')
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 1000, 900)
 
         # Create a central widget with a horizontal layout
         self.central_widget = QWidget(self)
@@ -18,7 +18,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self.file_explorer)
         splitter.addWidget(self.data_viewer)
-        splitter.setSizes([600,1500])
+        splitter.setSizes([600,1000])
 
         self.data_viewer = QWidget()  
         splitter.addWidget(self.data_viewer)

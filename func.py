@@ -100,8 +100,10 @@ DATA_TABLE = {'path':CURRENT_PATH,
              }
 
 # charts general parameters
-plt.rcParams['axes.facecolor'] = CONFIG['Chart']['background']  # background
-plt.rcParams['axes.edgecolor'] = get_darker_color(CONFIG['Chart']['frame_color'],10) # frame & axes
+sns.set_theme(style="ticks")
+sns.despine()
+#plt.rcParams['axes.facecolor'] = CONFIG['Chart']['background']  # background
+plt.rcParams['axes.edgecolor'] = get_darker_color(CONFIG['Chart']['frame_color'],50) # frame & axes
 plt.rcParams['text.color'] = CONFIG['Chart']['font_color']
 
 # help function
@@ -111,6 +113,40 @@ def get_categorical_columns(df:pd.DataFrame,max_categories=30):
 def get_numeric_columns(df:pd.DataFrame,min_uniques=10):
     '''return columns with > 10 unique values or numeric by type'''
     return [col for col in df.columns if len(df[col].unique()) > min_uniques or col in df.select_dtypes(include=['number'])]    
+def get_stats(data:pd.Series):
+        return {
+            'count':len(data),
+            'min':data.min(),
+            'max':data.max(),
+            'mean':data.mean(),
+            'median':data.median(),
+            'skewness':(3*(data.mean() - data.median()))/data.std() if data.std() != 0 else 0,
+            'std':data.std(),
+            'q1':data.quantile(0.25),
+            'q3':data.quantile(0.75),
+            'lcl':data.quantile(0.003),
+            '-3*std':data.quantile(0.003),
+            'ucl':data.quantile(0.997),
+            '+3*std':data.quantile(0.997),
+            'iqr':data.quantile(0.75) - data.quantile(0.25),
+            'IQR':f"[{data.quantile(0.25)}:{data.quantile(0.75)}]",
+            'lower_whisker':max(data.min(), data.quantile(0.25) - 1.5 * (data.quantile(0.75) - data.quantile(0.25))),
+            'upper_whisker':min(data.max(), data.quantile(0.75) + 1.5 * (data.quantile(0.75) - data.quantile(0.25))),
+            'outliers':[]
+        }
+def set_data(df:pd.DataFrame,y:str,by:str,contamination=0.0):
+        data = df[[y]].dropna() if by in [None,'None','none'] else df[[y,by]].dropna()
+        STATS = get_stats(data[y])
+
+        if contamination > 0:
+            iso_forest = IsolationForest(n_estimators=200, contamination=contamination, random_state=42)
+            data['inlier'] = iso_forest.fit_predict(data[[y]])
+        else:
+            data['inlier'] = 1    
+
+        outliers = data.loc[data['inlier']==-1,:].drop('inlier', axis=1).copy()
+        inliers = data.loc[data['inlier']==1,:].drop('inlier', axis=1).copy()
+        return data,inliers,outliers
 
 # preview
 def get_shape(df:pd.DataFrame,output_type:str='table'):
@@ -157,7 +193,7 @@ def get_preview(df:pd.DataFrame,rows=5,end='head',output_type:str='table'):
                 'default':f"'df'"
             },
             'rows':{
-                'type':'int',
+                'type':'number',
                 'options':[3,5,10,25],
                 'default':5
             },
@@ -208,18 +244,109 @@ def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table'):
             'output_type':{
                 'type':'category',
                 'options':[f"'table'",f"'text'"],
-                'default':'table'
+                'default':"'table'"
             }
             }
         }      
+def get_numerics_desc(df:pd.DataFrame,show='all',output_type:str='table'):
+    data = df.describe().T
+    numeric_columns = list(data.index)
+    data['count'] = data['count'].astype(int)
+    data["skewness"] = 3*(data['mean'] - data['50%'])/data['std']
 
-# charts
+    if show != 'all':
+        data = data[data.index == show]
+
+    data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
+    return {
+        'output':data,
+        'output_type':output_type,
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'show':{
+                'type':'category',
+                'options':["'all'"] + [f"'{col}'" for col in list(df.columns)],
+                'default':f"'all'"
+                },
+            'output_type':{
+                'type':'category',
+                'options':[f"'table'",f"'text'"],
+                'default':"'table'"
+            }
+        }
+        }    
+def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:str='table'):
+    categorical_columns = [col for col in df.columns if str(df[col].dtype) in ['object','category','bool']]
+    df = df[categorical_columns].copy()
+    data = {'column':[],'type':[],'unique':[],'mode':[],'mode_occurances':[],'mode%':[],'prob_outliers':[],'outlier_items':[],'outliers_occurance_probability':[]}
+    
+    for column in df.columns:
+        data['column'].append(column)
+        data['type'].append(str(df[column].dtype))
+        data['unique'].append(len(df[column].unique().tolist()))
+        data['mode'].append(df[column].mode()[0])
+        data['mode_occurances'].append(len(df[df[column]==df[column].mode()[0]]))
+        data['mode%'].append(f"{100*len(df[df[column]==df[column].mode()[0]])/len(df):.2f}%")
+
+        if outliers in [None,'None','none']:
+            data['prob_outliers'].append([])
+            data['outlier_items'].append([])
+            data['outliers_occurance_probability'].append([])
+        else:    
+            PERCENTAGE = float(outliers)
+            df['occ_prob'] = df[column].map(df[column].value_counts(normalize=True))
+            data['prob_outliers'].append(len(df[df['occ_prob'] < PERCENTAGE/100]))
+            data['outlier_items'].append(str(list(df.loc[df['occ_prob'] < PERCENTAGE/100,column].unique())))
+            data['outliers_occurance_probability'].append(str(list(df.loc[df['occ_prob'] < PERCENTAGE/100,'occ_prob'].unique())))
+        
+    data = pd.DataFrame(data).reset_index(drop=True)
+
+    if show != 'all':
+        data = data[data['column'] == show]
+
+    data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
+    return {
+        'output':data,
+        'output_type':output_type,
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'show':{
+                'type':'category',
+                'options':["'all'"] + [f"'{col}'" for col in list(df.columns)],
+                'default':f"'all'"
+                },
+            'outliers':{
+                'type':'number',
+                'options':[0.3,0.5,1,3,5,10],
+                'default':0.3
+            },
+            'output_type':{
+                'type':'category',
+                'options':[f"'table'",f"'text'"],
+                'default':"'table'"
+            }
+        }
+    }    
+
+
+
+# plots for plots
 def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
     def set_axis_style(ax,y:str,x:str):
-        ax.set_xlabel(x, fontsize=9, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
-        ax.set_ylabel(y, fontsize=9, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
+        ax.set_xlabel(x, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
+        ax.set_ylabel(y, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
         ax.tick_params(axis='x',labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
         ax.tick_params(axis='y', labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
     POINT_SIZE = 5 if len(df) > 1000 else 8 if len(df) > 200 else 9
     ALPHA = 0.2 if len(df) > 1000 else 0.4 if len(df) > 200 else 0.6
@@ -274,40 +401,27 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
             }
         }
     }
-def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None):
+def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_mean=False,category_mean=True):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=9, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
         ax.set_ylabel(y, fontsize=9, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
         ax.tick_params(axis='x',labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
         ax.tick_params(axis='y', labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
-    NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else len(df[by].unique())
-    fig, ax = plt.subplots(figsize=(5,5),dpi=85)
+    MAX_CATEGORIES = 30
+    NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else max(len(df[by].unique()),MAX_CATEGORIES)
+    HEIGHT = 5 if orient == 'v' else 1*NUM_OF_CATEGORIES
+    WIDTH = 1*NUM_OF_CATEGORIES if orient == 'v' else 5
+    fig, ax = plt.subplots(figsize=(WIDTH,HEIGHT),dpi=85)
+
     try:
-        sns.boxplot(
-            x=df[by],y=df[y],
-            linewidth=2,boxprops={"facecolor": "none", "edgecolor": 'black', "linewidth": 1.5},showfliers=False,
-            ax=ax
-            )
-        for i,cat in enumerate(df[by].unique()):
-            #print(cat) # monitor
-            COLOR_INDEX = i % len(CONFIG['Chart']['data_colors'])
-            data = df.loc[df[by]==cat,[y,by]]
-            POINT_SIZE = 5 if len(data) > 1000 else 8 if len(data) > 200 else 9
-            ALPHA = 0.2 if len(data) > 1000 else 0.4 if len(data) > 200 else 0.6
-            sns.stripplot(
-                y=data[y],x=data[by],
-                ax=ax,alpha=ALPHA,size=POINT_SIZE,linewidth=0.5,
-                color=CONFIG['Chart']['data_colors'][COLOR_INDEX],edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70),
-                jitter=0.35,zorder=0
-                ) 
-
+        set_box_plot(ax=ax,df=df,y=y,by=by,orient=orient,overall_mean=overall_mean,category_mean=category_mean)
+        set_strip_plot(ax=ax,df=df,y=y,by=by,orient=orient)
     except Exception as e:
         print(e)    
-
-    set_axis_style(ax,y,by)
     
-
     return {
         'output':fig,
         'output_type':'plot',
@@ -326,9 +440,26 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None):
                 'type':'category',
                 'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
                 'default':'None'
+            },
+            'orient':{
+                'type':'category',
+                'options':["'v'","'h'"],
+                'default':"'v'"
+            },
+            'overall_mean':{
+                'type':'category',
+                'options':['True','False'],
+                'default':'False'
+            },
+            'category_mean':{
+                'type':'category',
+                'options':['True','False'],
+                'default':'False'
             }
         }
     }
+
+    
 def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,sub_category:str=None,stack=False):
     def set_axis_style(ax,y:str,x:str):
         LABEL = f'Count({y})' if sub_category in [None,'None','none'] else f'Count({y}) by {sub_category}'
@@ -336,9 +467,15 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,sub_category:str=None,
         ax.set_ylabel(y, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
         ax.tick_params(axis='x',labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
         ax.tick_params(axis='y', labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+    def get_num_of_categories(df:pd.DataFrame=df,by:str=by,sub_category:str=sub_category):
+        by_amount = 1 if by in [None,'none','None'] else len(df[by].unique())
+        sub_amount = 1 if sub_category in [None,'none','None'] else len(df[sub_category].unique())
+        return by_amount*sub_amount
 
-    NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else len(df[by].unique())
-    fig, ax = plt.subplots(figsize=(5,NUM_OF_CATEGORIES),dpi=85)
+    NUM_OF_CATEGORIES = get_num_of_categories(df,by,sub_category)
+    fig, ax = plt.subplots(figsize=(1,NUM_OF_CATEGORIES),dpi=85)
     try:
         if sub_category in [None,'None','none']:
             #COLOR_PALLETTE = {cat:CONFIG['Chart']['data_colors'][i % len(CONFIG['Chart']['data_colors'])] for i,cat in enumerate(df[by].unique())}
@@ -363,7 +500,7 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,sub_category:str=None,
     except Exception as e:
         print(e)    
 
-    set_axis_style(ax,y,by)
+    #set_axis_style(ax,y,by)
     
 
     return {
@@ -398,7 +535,250 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,sub_category:str=None,
         }
     }
 
+# plots for analysis
+def set_strip_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',color:str=None):
+    def set_axis_style(ax,y:str,x:str):
+        if orient == 'v':
+            ax.set_xlabel(x, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+            ax.set_ylabel(y, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+        else:
+            ax.set_xlabel(y, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+            ax.set_ylabel(x, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color']) 
+
+        ax.tick_params(axis='x',labelsize=8,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        ax.tick_params(axis='y', labelsize=8,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_linewidth(1)
+        ax.spines['bottom'].set_linewidth(1)
+
+    if by in [None,'none','None']:
+        COLOR_INDEX = 0
+        POINT_SIZE = 5 if len(df) > 1000 else 8 if len(df) > 200 else 9
+        ALPHA = 0.2 if len(df) > 1000 else 0.4 if len(df) > 200 else 0.6
+        if orient == 'v':
+            sns.stripplot(y=df[y],
+                ax=ax,alpha=ALPHA,size=POINT_SIZE,linewidth=0.5,
+                color=CONFIG['Chart']['data_colors'][COLOR_INDEX] if color in [None,'none','None'] else 'white',
+                edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70) if color in [None,'none','None'] else color,
+                jitter=0.35,zorder=0
+                ) 
+        else:
+            sns.stripplot(x=df[y],
+                ax=ax,alpha=ALPHA,size=POINT_SIZE,linewidth=0.5,
+                color=CONFIG['Chart']['data_colors'][COLOR_INDEX] if color in [None,'none','None'] else 'white',
+                edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70) if color in [None,'none','None'] else color,
+                jitter=0.35,zorder=0
+                )  
+    else:    
+        for i,cat in enumerate(df[by].unique()):
+            #print(cat) # monitor
+            COLOR_INDEX = i % len(CONFIG['Chart']['data_colors'])
+            data = df[df[by]==cat].copy()
+            POINT_SIZE = 5 if len(data) > 1000 else 8 if len(data) > 200 else 9
+            ALPHA = 0.2 if len(data) > 1000 else 0.4 if len(data) > 200 else 0.6
+
+            if orient == 'v':
+                sns.stripplot(y=data[y],x=data[by],
+                    ax=ax,alpha=ALPHA,size=POINT_SIZE,linewidth=0.5,
+                    color=CONFIG['Chart']['data_colors'][COLOR_INDEX] if color in [None,'none','None'] else 'white',
+                    edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70) if color in [None,'none','None'] else color,
+                    jitter=0.35,zorder=0
+                    ) 
+            else:
+                sns.stripplot(x=data[y],y=data[by],
+                    ax=ax,alpha=ALPHA,size=POINT_SIZE,linewidth=0.5,
+                    color=CONFIG['Chart']['data_colors'][COLOR_INDEX] if color in [None,'none','None'] else 'white',
+                    edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70) if color in [None,'none','None'] else color,
+                    jitter=0.35,zorder=0
+                    )        
+
+    set_axis_style(ax,y,by)
+def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_mean=True,category_mean=True):
+    def set_axis_style(ax,y:str,x:str,orient=orient):
+        if orient == 'v':
+            ax.set_xlabel(x, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+            ax.set_ylabel(y, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+        else:
+            ax.set_xlabel(y, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+            ax.set_ylabel(x, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])   
+
+        ax.tick_params(axis='x',labelsize=8,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        ax.tick_params(axis='y', labelsize=8,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_linewidth(1)
+        ax.spines['bottom'].set_linewidth(1)
+    
+    if by in [None,'none','None']:    
+        if orient == 'h':
+            sns.boxplot(
+                x=df[y],
+                linewidth=1,
+                boxprops={"facecolor": "none", "edgecolor": 'black', "linewidth": 1},
+                showfliers=False,
+                ax=ax
+                )
+        else:    
+            sns.boxplot(
+                y=df[y],
+                boxprops={"facecolor": "none", "edgecolor": 'black', "linewidth": 1},
+                showfliers=False,
+                linewidth=1,
+                ax=ax
+                )    
+    else:       
+        if orient == 'h': 
+            sns.boxplot(
+                y=df[by],x=df[y],
+                linewidth=1,
+                boxprops={"facecolor": "none", "edgecolor": 'black', "linewidth": 1},
+                showfliers=False,
+                ax=ax
+                    )
+        else:
+             sns.boxplot(
+                x=df[by],y=df[y],
+                linewidth=1,
+                boxprops={"facecolor": "none", "edgecolor": 'black', "linewidth": 1},
+                showfliers=False,
+                ax=ax
+                    )           
+    
+    if category_mean == True and by not in [None,'none','None']:
+        mean_dict = dict(df.groupby(by)[y].mean())
+        if orient == 'h':
+            ax.scatter(x=[value for value in mean_dict.values()],y=[cat for cat in mean_dict.keys()],color='red',marker='D')
+            #sns.scatterplot(ax=ax,y=[cat for cat in mean_dict.keys()],x=[value for value in mean_dict.values()],markers=True)
+        elif orient == 'v':
+            ax.scatter(y=[value for value in mean_dict.values()],x=[cat for cat in mean_dict.keys()],color='red',marker='D')
+            #sns.scatterplot(ax=ax,x=[cat for cat in mean_dict.keys()],y=[value for value in mean_dict.values()],markers=True)
+
+    if overall_mean == True:
+        if orient == 'h':
+            ax.axvline(df[y].mean(), color='grey', linestyle="dashed", linewidth=1, label="Overall Mean",zorder=0)
+        elif orient == 'v':
+            ax.axhline(df[y].mean(), color='grey', linestyle="dashed", linewidth=1, label="Overall Mean",zorder=0)      
+
+    set_axis_style(ax,y,by)
+
+def set_dist_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,stat:str='count'):
+    def set_axis_style(ax,y:str,x:str,stat=stat):
+        ax.set_xlabel(x, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+        ax.set_ylabel(stat, fontsize=11, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+        ax.tick_params(axis='x',labelsize=8,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        ax.tick_params(axis='y', labelsize=8,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_linewidth(1)
+        ax.spines['bottom'].set_linewidth(1)
+    def set_vlines(ax,stats:{},keys:{}):
+        for key,color in keys.items():
+            #print(f"{key}:{stats[key]}(color={color})")
+            LABEL,VALUE,COLOR = key,stats[key],color
+            ax.axvline(VALUE, color=COLOR, linestyle='-',linewidth=2) #label=f'{LABEL} = {VALUE:.2f}'
+            ax.text(VALUE, 0, LABEL, horizontalalignment="center", verticalalignment="top", transform=ax.get_xaxis_transform(), rotation=45,color=COLOR)  
+
+    BINS_AMOUNT = int(len(df)**0.5) if by in [None,'none','None'] else [int(len(df[df[by]==cat])**0.5) for cat in df[by].unique()]
+    
+    if by not in [None,'none','None']:
+
+        for i,cat in enumerate(df[by].unique()):
+            #print(cat) # monitor
+            COLOR_INDEX = i % len(CONFIG['Chart']['data_colors'])
+            data = df[df[by]==cat].copy() 
+
+            sns.histplot(
+                data,x=y,
+                multiple='layer',stat=stat,
+                element='step',
+                kde=True,legend=False,
+                color=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],10),
+                ax=ax
+                )     
+    else:
+        sns.histplot(
+            df,x=y,
+            multiple='layer',stat=stat,
+            element='step',
+            kde=True,legend=False,
+            color=get_darker_color(CONFIG['Chart']['data_colors'][0],10),
+            ax=ax
+            )      
+        set_vlines(
+            ax=ax,
+            stats=get_stats(df[y]),
+            keys={'mean':get_darker_color(CONFIG['Chart']['data_colors'][0],60),'median':get_darker_color(CONFIG['Chart']['data_colors'][0],30)}
+            )   
+
+
+    set_axis_style(ax=ax,y=y,x=by,stat=stat)
+
+
 # analysis 
+def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0.03):
+    def set_log(y,by,contamination):
+        return f'''
+        Outliers Detection:
+        df = '{DATA_TABLE["file_name"]}'
+        y = '{y}'
+        Contamination = {contamination}
+        '''
+
+    fig, ax = plt.subplots(3,1,figsize=(10,10),dpi=85)
+    log = set_log(y,by,contamination)
+
+    if y not in [None,'none','None']:
+        all_data, inliers, outliers = set_data(df=df,y=y,by=by,contamination=contamination)
+        STATS = get_stats(df[y])
+        table = pd.DataFrame(
+            { # summary table
+                'category':['all'],
+                'count':[f"{STATS['count']:.2f}"],
+                'min':[f"{STATS['min']:.2f}"],
+                'mean':[f"{STATS['mean']:.2f}"],
+                'median':[f"{STATS['median']:.4f}"],
+                'std':[f"{STATS['std']:.2f}"],
+                'max':[f"{STATS['max']:.2f}"],
+                'IQR':[f"[{STATS['q1']:.2f}:{STATS['q3']:.2f}]"],
+                'skewness':[f"{STATS['skewness']:.2f}"],
+                'outliers':[len(outliers)]
+            }
+        )
+
+        set_box_plot(ax=ax[0],df=all_data,y=y,by=by,orient='h')
+        set_strip_plot(ax=ax[0],df=inliers,y=y,by=by,orient='h') 
+        set_strip_plot(ax=ax[0],df=outliers,y=y,by=by,orient='h',color='red') 
+        set_dist_plot(ax=ax[1],df=all_data,y=y,by=by)
+    else:
+        table = pd.DataFrame()    
+
+    return {
+        'output':{'log':log,'plot':fig,'table':table},
+        'output_type':'analysis',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=1)],
+                'default':None
+            },
+            'by':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':'None'
+            },
+            'contamination':{
+                'type':'number',
+                'options':[0.03,0.05,0.1],
+                'default':0.03
+            }
+        }
+    }
 def get_dist_plot(df:pd.DataFrame,x:str=None,by:str=None,outliers="none"):
     def get_stats(data):
         return {

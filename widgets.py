@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QVBoxLayout,QHBoxLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame
-from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea
+from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit
 
 from PyQt5.QtGui import QColor,QIcon,QPixmap
-from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize
+from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize,QPropertyAnimation
 import sys
 from func import *
 
@@ -160,6 +160,12 @@ class CodeControls(QWidget):
         left_layout.addWidget(self.add)
 
         # right side buttons
+        self.comment = QPushButton('', self)
+        self.comment.setIcon(QIcon(f'{CURRENT_PATH}/icons/comment.png'))
+        self.comment.setStyleSheet(BUTTON_STYLE)
+        self.comment.clicked.connect(self.set_comment)
+        right_layout.addWidget(self.comment)
+
         self.pin = QPushButton('', self)
         self.pin.setIcon(QIcon(f'{CURRENT_PATH}/icons/thumbtack.png'))
         self.pin.setStyleSheet(BUTTON_STYLE)
@@ -186,6 +192,10 @@ class CodeControls(QWidget):
 
         self.setLayout(layout)
 
+    def set_comment(self):
+        #print('comment') # monitor
+        current_cmd_block = self.parent().parent()
+        current_cmd_block.add_comment()
     def set_pin(self):
         current_cmd_block = self.parent().parent()
         layout = current_cmd_block.parent().layout()
@@ -240,7 +250,7 @@ class ArgsMenu(QWidget):
         self.layout.setAlignment(Qt.AlignRight) 
         
         for arg_name,arg in args.items():
-            #print(f"arg_name={arg_name}; arg={arg}") # monitor
+            print(f"arg_name={arg_name}; arg={arg}") # monitor
             if arg['type'] == 'category':
                 combo = QComboBox()
                 combo.addItems(arg['options'])
@@ -267,7 +277,7 @@ class ArgsMenu(QWidget):
                 combo.currentIndexChanged.connect(self.update_command)
                 self.layout.addWidget(combo)
 
-            elif arg['type'] == 'int':    
+            elif arg['type'] == 'number':    
                 int_arg = QLineEdit()
                 int_arg.setText(str(arg['default']))  # Set default text
                 int_arg.setFixedWidth(min(MAX_ARG_WIDTH,max([12*len(str(item)) for item in arg['options']])))
@@ -333,7 +343,50 @@ class ArgsMenu(QWidget):
                 item.setCurrentText(current_arg)
             elif isinstance(item,QLineEdit):
                 item.setText(current_arg)    
-        
+class Comment(QTextEdit):
+    def __init__(self, collapsed_height=20, expanded_height=40, duration=200):
+        super().__init__()
+
+        self.collapsed_height = collapsed_height
+        self.expanded_height = expanded_height
+
+        self.setHtml("<p>Add Comment.</p>")
+        self.setFixedHeight(self.collapsed_height)
+
+        # Smooth height transition
+        self.animation = QPropertyAnimation(self, b"minimumHeight")
+        self.animation.setDuration(duration)
+
+        # Apply a subtle border effect
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                font:{CONFIG['CodeLine']['font']};
+                color:{CONFIG['CodeLine']['color']};
+                border: 1px solid blue;
+                background-color: lightblue;
+                border-radius: 5px;
+                padding: 1px;
+                transition: border-color 0.2s ease-in-out;
+            }}
+            QTextEdit:focus {{
+                border: 1px solid red
+                border-color: lightred;
+            }}
+        """)
+
+    def focusInEvent(self, event):
+        self.animate_resize(self.expanded_height)
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        self.animate_resize(self.collapsed_height)
+        super().focusOutEvent(event)
+
+    def animate_resize(self, target_height):
+        self.animation.setStartValue(self.height())
+        self.animation.setEndValue(target_height)
+        self.animation.start()
+
 class CommandBlock(QWidget):
     def __init__(self,data:pd.DataFrame=DATA_TABLE,cmd:str=''):
         super().__init__()
@@ -349,19 +402,25 @@ class CommandBlock(QWidget):
         self.block.setFrameShape(QFrame.StyledPanel)
         self.block.setFrameShadow(QFrame.Raised)
         self.block.setStyleSheet(f"""
-            background-color: white;
-            border: 1px solid #dedede;
-            border-radius: 15px;
+            QFrame {{
+                background-color: white;
+                border: 1px solid #dedede;
+                border-radius: 15px;
+            }}
+            QFrame:hover {{
+                border: 1px solid {CONFIG['CodeLine']['color']};
+            }}
         """)
-        self.block.setFixedSize(900,120) 
+        self.block.setFixedSize(1200,120) 
         
         # Create layout
         self.layout = QVBoxLayout(self.block)
         
         # Add sub-widgets
         self.code_controls = CodeControls()
-        self.code_line = CodeLine(self._cmd)
         self.layout.addWidget(self.code_controls)
+
+        self.code_line = CodeLine(self._cmd)
         self.layout.addWidget(self.code_line)
         
         # Main layout
@@ -369,14 +428,18 @@ class CommandBlock(QWidget):
         self.layout.setAlignment(Qt.AlignTop)
         self.layout.setSpacing(1)
         main_layout.addWidget(self.block)
-        
+
         self.setLayout(main_layout)
     
     def get_attributes(self):
-        return {'self._cmd':f"{self._cmd}",'self._args':f"{self._args}",'self._output':f"{self._output}"}    
+        return {'self._cmd':f"{self._cmd}",'self._args':f"{self._args}",'self._output':f"{self._output}"} 
+    def add_comment(self):
+        self.comment = Comment()
+        self.layout.addWidget(self.comment)
+        self.block.setFixedSize(self.block.width(),self.block.height() + 50)
     def run_command(self):
         def delete_prev_output(self):
-            for item_type in [ArgsMenu,TextOutput,TableOutput,ChartOutput,PlotOutput]:
+            for item_type in [ArgsMenu,TextOutput,TableOutput,AnalysisOutput,PlotOutput]:
                 try:
                     output_widget = self.findChild(item_type)
                     output_widget.setParent(None)
@@ -389,7 +452,7 @@ class CommandBlock(QWidget):
         delete_prev_output(self)
 
         df = DATA_TABLE['df']
-        output_obj = eval(self._cmd)
+        output_obj = eval(self._cmd) # processing command
 
         self._args = ArgsMenu(output_obj['args'])
         self.layout.addWidget(self._args)
@@ -400,11 +463,17 @@ class CommandBlock(QWidget):
             self._output = TableOutput(output_obj['output'])
         elif output_obj['output_type'] == 'plot':  
             self._output = PlotOutput(output_obj['output'])      
-        elif output_obj['output_type'] == 'chart':  
-            self._output = ChartOutput(output_obj['output'])  
+        elif output_obj['output_type'] == 'analysis':  
+            self._output = AnalysisOutput(
+                plot=output_obj['output']['plot'],
+                log=output_obj['output']['log'],
+                table=output_obj['output']['table']
+                )  
 
-        self.block.setFixedHeight(self._output._rows)
+        self.block.setFixedHeight(150 + self._output._height)
         self.layout.addWidget(self._output)
+
+        
     
 # data viewer
 class DataViewer(QWidget):
@@ -464,6 +533,7 @@ class DataViewer(QWidget):
             }}
         """)
         self.tabs.setIconSize(QSize(45,45))  # Set tab icon size
+        self.tabs.setFixedWidth(1500)
         
         # Preview
         self.preview_tab = QWidget()
@@ -692,35 +762,36 @@ class PlotOutput(QWidget):
     def __init__(self, fig=None, parent=None):
         super().__init__(parent)
 
-        self._rows = 550 # height
+        self._height = 550 # height
+        LABEL_STYLE = f"""
+            QLabel {{
+                font: {CONFIG['Table']['font']};
+                color: {CONFIG['Table']['color']};
+                background-color: white; 
+                white-space: pre;
+                padding: 1px 10px; 
+                border-radius: {CONFIG["Controls"]["border-radius"]};
+                border: 0px solid white;
+            }}
+            QLabel:hover {{
+                color: {CONFIG['FileExplorer']['color']};
+            }}
+        """
 
         self.setStyleSheet("background-color: white; border: 2px solid #333;")
         #self.setFixedSize(400,400)
         
         self.layout = QVBoxLayout()
+
+        self.log = QLabel(text=f"df = {DATA_TABLE['file_name']}\n")
+        self.log.setStyleSheet(LABEL_STYLE) 
+        self.layout.addWidget(self.log)
+
         self.canvas = FigureCanvas(fig if fig else plt.figure())
         self.layout.addWidget(self.canvas)
         self.setLayout(self.layout)
 
     def set_plot(self, fig):
-        self.canvas.figure = fig
-        self.canvas.draw()
-class ChartOutput(QWidget):
-    def __init__(self, fig=None, parent=None):
-        super().__init__(parent)
-
-        self._rows = 900 # height
-
-        self.setStyleSheet("background-color: #f0f0f0; border: 2px solid #333;")
-        self.setFixedSize(600, 400)
-        
-        self.layout = QVBoxLayout()
-        self.canvas = FigureCanvas(fig if fig else plt.figure())
-        self.layout.addWidget(self.canvas)
-        self.setLayout(self.layout)
-
-    def set_chart(self, fig):
-        """Update the widget with a new Seaborn/Matplotlib chart without saving as an image."""
         self.canvas.figure = fig
         self.canvas.draw()
 class TableOutput(QWidget):
@@ -752,7 +823,7 @@ class TableOutput(QWidget):
             
             return styled_text
 
-        self._rows = min(max(200+20*len(df),320),800)
+        self._height = min(max(22*(1 + len(df)),150),1000)
         self._df = df
         self._html_df = set_style(df.to_string(index=True))
         
@@ -771,7 +842,7 @@ class TableOutput(QWidget):
         self.layout = QVBoxLayout()
         self.layout.setAlignment(Qt.AlignTop)
         self.layout.setSpacing(1)
-        
+
         self.outbox = QLabel(self._html_df)
         self.outbox.setWordWrap(False)
         self.outbox.setAlignment(Qt.AlignLeft)
@@ -830,7 +901,7 @@ class TextOutput(QWidget):
         super().__init__()    
 
         self._text = text
-        self._rows = min(max(200 + 20*len(text.split('\n')),320),800)
+        self._height = min(max(25*(1+len(text.split('\n'))),220),800)
         self._width = min(800,100*max([len(row_str) for row_str in text.split('\n')]))
         
         #print(f"height = {self._rows}") # monitor
@@ -902,3 +973,18 @@ class TextOutput(QWidget):
         self.layout.addWidget(scroll_area)
 
         self.setLayout(self.layout)
+class AnalysisOutput(QWidget):
+    def __init__(self,plot,log:str='',table:pd.DataFrame=pd.DataFrame()):
+        super().__init__()
+
+        self._height = 900 # height
+
+        self.setStyleSheet("background-color: #f0f0f0; border: 2px solid #333;")
+        #self.setFixedSize(600, 400)
+        
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(TextOutput(text=log))
+        self.layout.addWidget(TableOutput(df=table))
+        self.layout.addWidget(PlotOutput(fig=plot))
+        self.setLayout(self.layout)
+     

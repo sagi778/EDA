@@ -1,6 +1,6 @@
 {
     "CodeLine":{
-        "font": "14px Consolas",
+        "font": "14px Ubuntu",
         "color": "#919191",
         "background-color": "#f4f4f4",
         "border": "1px solid #dedede",
@@ -14,7 +14,7 @@
     "FileExplorer":{
         "background-color": "white",
         "selection-color": "#a9cce3",
-        "font": "13px Consolas",
+        "font": "13px Ubuntu",
         "color": "#34495e"
     },
     "DataViewer":{
@@ -46,7 +46,7 @@
         "border-radius":"15px"
     },
     "arguments":{
-        "font": "13px Consolas",
+        "font": "13px Ubuntu",
         "color": "#919191"
     },
     "Output":{
