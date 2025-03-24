@@ -9,7 +9,7 @@ Exploring the data is conducted via CommandBlocks from the following Tabs:
 "Story" Tab is empty & will contain only saved CommandBlocks - it is used for presenting the final result.  
 
   
-# Preview Tab:
+# Preview Tab blocks:
 ![get_preview](screenshots/get_preview.png)
 
 ![get_data](screenshots/get_data.png)
@@ -20,34 +20,9 @@ Exploring the data is conducted via CommandBlocks from the following Tabs:
 
 ![get_categorical_desc](screenshots/get_categorical_desc.png)
 
-
-# Visualization code blocks:
-### get_dist_plot() : 
-Explore Numeric values distribution with verious outliers options:
-![get_dist_plot_iqr](screenshots/get_dist_plot_iqr.png)
-![get_dist_plot_3perc](screenshots/get_dist_plot_3perc.png)
-
-### get_relation_plot() : 
-exploring relation between 2 numeric columns:
-* include all data points (=no outliers):
-![get_relation_plot_no_categories_no_outliers](screenshots/get_relation_plot_no_categories_no_outliers.png)
-* include only inlier data points (= outliers excluded based on [LocalOutlierFactor](https://scikit-learn.org/1.5/modules/generated/sklearn.neighbors.LocalOutlierFactor.html) density value):
-![get_relation_plot_no_categories_5perc_outliers](screenshots/get_relation_plot_no_categories_5perc_outliers.png)
-* break the data to categories:
-![get_relation_plot_2_categories_5perc_outliers](screenshots/get_relation_plot_2_categories_5perc_outliers.png)
+# Plots Tab blocks:
 
 
-
-![get_dist_plot](screenshots/get_dist_plot.png)
-
-
-
-![get_comapre](screenshots/get_compare.png)
-
-# Visualization/Tabular code blocks:
-  ## get_corralations() : 
-  can be shown in tabular/chart - allows an overview of linear correlation magnitude(=r^2)
-  ![get_correlations](screenshots/get_correlations.png)
 
 # Contact me:
 Help me improve,
