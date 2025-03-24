@@ -7,8 +7,10 @@
         "get_categorical_desc(df=df,show='all',outliers='None',output_type='table')"
     ],
     "Plots":[
-        "get_box_plot(df=df,y=None,by=None,orient='v',overall_mean='False',category_mean='False')",
-        "get_count_plot(df=df,y=None,by=None,sub_category=None,stack='False')"
+        "get_scatter_plot(df=df,y=None,x=None,by=None)",
+        "get_box_plot(df=df,y=None,by=None,orient='v',overall_mean='False',category_mean='False',std_lines='False')",
+        "get_count_plot(df=df,y=None,by=None)",
+        "get_dist_plot(df=df,y=None,by=None,stat='count')"
     ],
     "Analysis":[
         "get_outliers_analysis(df=df,y=None,by=None,contamination=0.03)"

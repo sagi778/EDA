@@ -250,7 +250,7 @@ class ArgsMenu(QWidget):
         self.layout.setAlignment(Qt.AlignRight) 
         
         for arg_name,arg in args.items():
-            print(f"arg_name={arg_name}; arg={arg}") # monitor
+            #print(f"arg_name={arg_name}; arg={arg}") # monitor
             if arg['type'] == 'category':
                 combo = QComboBox()
                 combo.addItems(arg['options'])
