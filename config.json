@@ -26,9 +26,9 @@
     "Chart":{
         "background":"#f4f4f4",
         "data_colors":["#8fc7f1","#edba92","#d89fee","#59f989","#5dade2","#eb984e","#2ecc71","#e74c3c","#f4d03f","#a569bd"],
-        "frame_color":"#dedede",
+        "frame_color":"#34495e",
         "font":"Consolas",
-        "font_color":"#919191",
+        "font_color":"#34495e",
         "font_size":9,
         "mean_color":"#48B370",
         "median_color":"#B03443"
@@ -36,7 +36,7 @@
     "Table":{
         "alt-row-color":"#f4f4f4",
         "font":"14px Consolas",
-        "color":"#616a6b"
+        "color":"#34495e"
     },
     "Controls":{
         "background-color":"white",
@@ -50,8 +50,8 @@
         "color": "#919191"
     },
     "Output":{
-        "font": "12px Consolas",
-        "color": "#616a6b",
+        "font": "16px Consolas",
+        "color": "#34495e",
         "table":{
             "background-color":"#f4f4f4"
         }
