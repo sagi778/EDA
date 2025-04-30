@@ -21,17 +21,14 @@ Exploring the data is conducted via CommandBlocks from the following Tabs:
 ![get_categorical_desc](screenshots/get_categorical_desc.png)
 
 # Plots Tab blocks:
-![get_box_plot](screenshots/get_box_plot.png)
+![get_box_plot](screenshots/get_box_plot.png)  
+![get_dist_plot](screenshots/get_dist_plot.png)  
+![get_count_plot](screenshots/get_count_plot.png)  
+![get_count_plot_2](screenshots/get_count_plot_2.png)  
 
 
-# Contact me:
-Help me improve,
 
-see anything missing?
 
-think that some function/code block might be helpful to you?
-
-leave a comment 
 
 
 
