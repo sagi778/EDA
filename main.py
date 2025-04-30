@@ -20,7 +20,6 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.data_viewer)
         splitter.setSizes([600,1000])
 
-        self.data_viewer = QWidget()  
         splitter.addWidget(self.data_viewer)
 
         self.layout.addWidget(splitter)
@@ -29,5 +28,15 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
+
+    # handle thread stopping on window close
+    def on_close():
+        try:
+            ThreadManager.stop_all()     
+        except:
+            pass     
+
+    app.aboutToQuit.connect(on_close)
+
     window.show()
     sys.exit(app.exec_())

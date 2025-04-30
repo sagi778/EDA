@@ -6,13 +6,18 @@
         "get_numerics_desc(df=df,show='all',output_type='table')",
         "get_categorical_desc(df=df,show='all',outliers=None,output_type='table')"
     ],
+    "SQL":[
+        "get_data(df=df,output_type='table',query='SELECT * FROM df LIMIT 10')"
+    ],
     "Plots":[
         "get_scatter_plot(df=df,y=None,x=None,by=None)",
         "get_box_plot(df=df,y=None,by=None,orient='v',overall_mean='False',category_mean='False',std_lines='False')",
-        "get_count_plot(df=df,y=None,by=None)",
-        "get_dist_plot(df=df,y=None,by=None,stat='count',category_stats='True',overall_stats='False')"
+        "get_count_plot(df=df,y=None,by=None,orient='h')",
+        "get_dist_plot(df=df,y=None,by=None,stat='count',orient='v',category_stats='True',overall_stats='False')"
     ],
     "Analysis":[
+        "get_correlation_analysis(df=df,y=None,x=None,by=None,contamination=0.03)",
+        "get_anova_analysis(df=df,y=None,by=None,contamination=0.03)",
         "get_outliers_analysis(df=df,y=None,by=None,contamination=0.03)"
     ]
 }

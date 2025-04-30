@@ -50,7 +50,7 @@
         "color": "#919191"
     },
     "Output":{
-        "font": "16px Consolas",
+        "font": "14px Consolas",
         "color": "#34495e",
         "table":{
             "background-color":"#f4f4f4"
