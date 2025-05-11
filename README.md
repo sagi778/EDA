@@ -27,7 +27,7 @@ Exploring the data is conducted via CommandBlocks from the following Tabs:
 ![get_count_plot_2](screenshots/get_count_plot_2.png)  
 
 
-# Plots Tab blocks:
+# Analysis Tab blocks:
 
 
 
