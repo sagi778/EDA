@@ -7,7 +7,7 @@
         "get_categorical_desc(df=df,show='all',outliers=None,output_type='table')"
     ],
     "SQL":[
-        "get_data(df=df,output_type='table',query='SELECT * FROM df LIMIT 10')"
+        "get_data(df=df,output_type='table',show=100,query='SELECT * FROM df')"
     ],
     "Plots":[
         "get_scatter_plot(df=df,y=None,x=None,by=None)",
@@ -18,7 +18,8 @@
     "Analysis":[
         "get_correlation_analysis(df=df,y=None,x=None,by=None,contamination=0.03)",
         "get_anova_analysis(df=df,y=None,by=None,contamination=0.03)",
-        "get_outliers_analysis(df=df,y=None,by=None,contamination=0.03)"
+        "get_outliers_analysis(df=df,y=None,by=None,contamination=0.03)",
+        "get_chi2_analysis(df=df,y=None,by=None,alpha=0.05)"
     ]
 }
     

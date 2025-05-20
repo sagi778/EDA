@@ -28,15 +28,5 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-
-    # handle thread stopping on window close
-    def on_close():
-        try:
-            ThreadManager.stop_all()     
-        except:
-            pass     
-
-    app.aboutToQuit.connect(on_close)
-
     window.show()
     sys.exit(app.exec_())

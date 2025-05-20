@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.gridspec as gridspec
 import duckdb
 from tabulate import tabulate
 import os
@@ -11,8 +12,11 @@ import seaborn as sns
 import io
 import traceback
 import statsmodels.api as sm
+import textwrap
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import LocalOutlierFactor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error
 from scipy import stats
 from scipy.stats import linregress,gaussian_kde,shapiro,ttest_ind
 from sklearn.ensemble import IsolationForest
@@ -304,8 +308,9 @@ def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:
     }    
 
 # sql
-def get_data(df:pd.DataFrame,output_type:str='table',query:str='SELECT * FROM df LIMIT 10'):
+def get_data(df:pd.DataFrame,output_type:str='table',show='100',query:str='SELECT * FROM df'):
     data = duckdb.query(query).to_df()
+    data = data.head(show) if show != 'all' else data
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
 
     return {
@@ -322,6 +327,11 @@ def get_data(df:pd.DataFrame,output_type:str='table',query:str='SELECT * FROM df
                     'options':[f"'table'",f"'text'"],
                     'default':'table'
                     },
+                'show':{
+                    'type':'category',
+                    'options':['10','25','50','100','200','all'],
+                    'default':'100'
+                },    
                 'query':{
                     'type':'query',
                     'options':[f"'SELECT * FROM df LIMIT 10'"],
@@ -346,12 +356,31 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_linewidth(1)
         ax.spines['bottom'].set_linewidth(1)
-
+    def set_height(df=df,by=by,orient=orient,num_of_categories:int=5):
+        try:
+            if orient == 'v':
+                max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
+                return min(max(350,2*max_data_to_category),600)
+            elif orient == 'h':
+                return min(max(350,num_of_categories*20),600)
+        except:    
+            return 300        
+    def set_width(df=df,by=by,orient=orient,num_of_categories:int=5):
+        try:
+            if orient == 'h':
+                max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
+                return min(max(300,2*max_data_to_category),600)
+            elif orient == 'v':
+                return min(max(200,num_of_categories*20),600)
+        except:        
+            return 300 
+        
     MAX_CATEGORIES = 30
-    NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else max(len(df[by].unique()),MAX_CATEGORIES)
-    HEIGHT = 5 if orient == 'v' else 2*NUM_OF_CATEGORIES
-    WIDTH = 1*NUM_OF_CATEGORIES if orient == 'v' else 5
-    fig, ax = plt.subplots(figsize=(WIDTH,HEIGHT),dpi=75)
+    NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else min(len(df[by].unique()),MAX_CATEGORIES)
+    HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
+    #print(f"height: {HEIGHT}, width: {WIDTH}") # monitor
+
+    fig, ax = plt.subplots(figsize=(HEIGHT,WIDTH),dpi=75)
     set_axis_style(ax=ax,y=y,x=by,orient=orient)
 
     try:
@@ -362,7 +391,7 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
     
     return {
         'output':fig,
-        'size':(100*WIDTH,100*HEIGHT),
+        'size':(HEIGHT,WIDTH),
         'output_type':'plot',
         'args':{
             'df':{
@@ -407,13 +436,30 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
         y_amount = 1 if y in [None,'none','None'] else len(df[y].unique())
         by_amount = 1 if by in [None,'none','None'] else len(df[by].unique())
         return y_amount*by_amount
-
+    def set_height(df=df,by=by,orient=orient,num_of_categories:int=5):
+            try:
+                if orient == 'v':
+                    max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
+                    return min(max(300,2*max_data_to_category),600)
+                elif orient == 'h':
+                    return min(max(200,num_of_categories*20),600)
+            except:    
+                return 300        
+    def set_width(df=df,by=by,orient=orient,num_of_categories:int=5):
+            try:
+                if orient == 'h':
+                    max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
+                    return min(max(300,2*max_data_to_category),600)
+                elif orient == 'v':
+                    return min(max(200,num_of_categories*20),600)
+            except:        
+                return 300 
+        
     NUM_OF_CATEGORIES = get_num_of_categories(df,y,by)
-    if orient == 'h':
-        fig, ax = plt.subplots(figsize=(1,NUM_OF_CATEGORIES),dpi=75)
-    elif orient == 'v':
-        fig, ax = plt.subplots(figsize=(5,2),dpi=85)    
-    
+    HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
+
+    fig, ax = plt.subplots(figsize=(HEIGHT,WIDTH),dpi=75)
+      
     try:
         set_count_plot(ax=ax,df=df,y=y,by=by,orient=orient)
     except Exception as e:
@@ -421,7 +467,7 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
 
     return {
         'output':fig,
-        'size':(100,100*NUM_OF_CATEGORIES),
+        'size':(HEIGHT,WIDTH),
         'output_type':'plot',
         'args':{
             'df':{
@@ -458,7 +504,7 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
     POINT_SIZE = 5 if len(df) > 1000 else 8 if len(df) > 200 else 9
     ALPHA = 0.2 if len(df) > 1000 else 0.4 if len(df) > 200 else 0.6
     
-    fig, ax = plt.subplots(figsize=(5,5),dpi=75)
+    fig, ax = plt.subplots(figsize=(5,POINT_SIZE),dpi=75)
     set_axis_style(ax,y,x)
 
     try:
@@ -468,7 +514,7 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
     
     return {
         'output':fig,
-        'size':(500,500),
+        'size':(300,700),
         'output_type':'plot',
         'args':{
             'df':{
@@ -506,7 +552,7 @@ def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient
 
     return {
         'output':fig,
-        'size':(300,500) if orient == 'v' else (500,300),
+        'size':(300,500) if orient == 'v' else (500,700),
         'output_type':'plot',
         'args':{
             'df':{
@@ -753,8 +799,6 @@ def set_dist_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',ori
             for stat,value in {'mean':np.mean(data),'median':np.median(data)}.items():
                 ax.axhline(value, color=color, linestyle=style,linewidth=1)
                 ax.text(0,value, stat, verticalalignment="center", horizontalalignment="left", transform=ax.get_yaxis_transform(), rotation=0,color=color)      
-
-    #BINS_AMOUNT = int(len(df)**0.5) if by in [None,'none','None'] else [int(len(df[df[by]==cat])**0.5) for cat in df[by].unique()]
     
     set_axis_style(ax=ax,y=y,x=by,stat=stat)
 
@@ -781,6 +825,7 @@ def set_dist_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',ori
                     ax=ax
                 )     
         else:
+            print(f"{by=}\n{df.head()}") # monitor
             COLOR_PALLETTE = {cat:CONFIG['Chart']['data_colors'][i % len(CONFIG['Chart']['data_colors'])] for i,cat in enumerate(df[by].unique())}
             for cat,color in COLOR_PALLETTE.items():
                 if orient == 'v':
@@ -842,7 +887,7 @@ def set_count_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
 
     set_axis_style(ax=ax,y=y,x=by)
     set_anotation(ax=ax,orient=orient)
-def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
+def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
         ax.set_ylabel(y, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
@@ -873,31 +918,184 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
                 label=cat
             ) 
 
-    ax.legend()
+    try:
+        ax.legend()
+    except:
+        pass    
     set_axis_style(ax=ax,y=y,x=x)
 
 # analysis 
+def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
+    def set_log(df,y,by,alpha,ct):
+        ct = pd.crosstab(df[by], df[y])
+        chi2, p, dof, expected = stats.chi2_contingency(ct)
+        return textwrap.dedent(f'''\
+                Chi-Squared Analysis:
+                ---------------------
+                df = '{DATA_TABLE["file_name"]}'
+                y = '{y}' (= Response column)
+                by = {by} 
+                α = {alpha} (= Significance level)
+
+                Null Hypothesis (H0): {y} and {by} are independent
+                Alternative Hypothesis (H1): {y} and {by} are dependent
+
+                Chi-Squared Test:
+                ---------------------
+                Chi2 = {chi2:.2f}
+                p-value = {p:.4f}
+                Degrees of Freedom (dof) = {dof}
+                Decision: {'Reject H0 (dependent)' if p < alpha else 'Fail to reject H0 (independent)'}
+                ''')
+    
+    ct = pd.crosstab(df[by], df[y])
+    chi2, p, dof, expected = stats.chi2_contingency(ct)
+    residuals = (ct - expected) / expected**0.5
+    log = set_log(df,y,by,alpha,ct)
+
+    # Plots
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+
+    sns.heatmap(ct, annot=True, fmt='d', cmap='Blues', ax=axes[0])
+    axes[0].set_title('Observed Counts')
+
+    sns.heatmap(pd.DataFrame(expected, index=ct.index, columns=ct.columns),
+                annot=True, fmt='.1f', cmap='Oranges', ax=axes[1])
+    axes[1].set_title('Expected Counts')
+
+    sns.heatmap(residuals, annot=True, fmt='.2f', center=0, cmap='coolwarm', ax=axes[2])
+    axes[2].set_title('Standardized Residuals')
+
+    return {
+        'output':{'log':log,'plot':fig,'table':ct},
+        'output_type':'analysis',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':None
+            },
+            'by':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':'None'
+            },
+            alpha:{
+                'type':'number',
+                'options':[0.01,0.05,0.1],
+                'default':0.05
+            }
+        }
+    }
 def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,contamination:float=0.03):
     def set_log(df,y,x,by,contamination):
-        return f'''
+        return textwrap.dedent(f"""\
         Correlation Analysis (= Numeric vs Numeric):
         --------------------------------------------
         df = '{DATA_TABLE["file_name"]}'
-        y = '{y}' (= Response column)
-        X = '{x}' (= Predictor column)
-        by = {by} 
-        Contamination = {contamination} (=Ignored % of data points)
-        '''
-    
-    fig, ax = plt.subplots(2,2,figsize=(10,10),dpi=75)
+        y  = '{y}'  (= Response column)
+        X  = '{x}'  (= Predictor column)
+        by = '{by}'
+        Contamination = {contamination}  (= Ignored % of data points)
+    """)
+
+    fig = plt.figure(figsize=(6,7), dpi=80,constrained_layout=True)
+    gs = gridspec.GridSpec(2, 2, width_ratios=[5,1], height_ratios=[1,5], wspace=0.05, hspace=0.05)
+
     #set_axis_style(ax=ax,y=y,x=by)
     log = set_log(df,y,x,by,contamination)
-    table = pd.DataFrame(data={'Missing Data':['Pick y column']})
+    table = pd.DataFrame(columns=['category','count','included','ignored','equation','r2','rmse'])
+    
 
     if y not in [None,'none','None'] and x not in [None,'none','None']:
-        set_scatter_plot(ax=ax[1,0],df=df,y=y,x=x,by=by)    
-        set_dist_plot(ax=ax[0,0],df=df,y=x,by=by,stat='count',category_stats=False,overall_stats=False)
-        set_dist_plot(ax=ax[1,1],df=df,y=y,by=by,stat='count',orient='h',category_stats=False,overall_stats=False)
+
+        if by in [None,'none','None']:
+
+            data = df[[x,y]].copy()
+            data['pred'],data['inlier'] = None, None  # Initialize column
+            if contamination > 0:
+                clf = IsolationForest(contamination=contamination, random_state=42, n_estimators=200)
+                data['inlier'] = clf.fit_predict(data[[y,x]])
+            else:
+                data['inlier'] = 1  
+
+            reg_data = data[data.inlier == 1].copy()
+            X, y_act = reg_data[[x]], reg_data[y] 
+            lr = LinearRegression()
+            lr.fit(X, y_act)
+            reg_data['pred'] = lr.predict(X)
+            r2 = r2_score(y_act, reg_data['pred'])
+            rmse = mean_squared_error(y_act, reg_data['pred'], squared=False)
+            table.loc[len(table)] = [None,len(data),len(reg_data),int(len(data)*contamination),f"y = {lr.intercept_:.2f} + {lr.coef_[0]:.2f}*x",r2,rmse]
+
+            ax3 = fig.add_subplot(gs[1,0]) 
+            set_scatter_plot(ax=ax3,df=reg_data,y=y,x=x,by=by) # inliers
+            ax3.plot(X,reg_data['pred'], color='red',linewidth=1.5)
+
+        else:
+            data = df[[x, y, by]].copy()
+            data['pred'], data['inlier'] = None, None  # Initialize column
+            ax3 = fig.add_subplot(gs[1, 0]) 
+
+            # --- Generate label_color_map before loop ---
+            temp_ax = fig.add_subplot(gs[0, 0])  # temporary axis for color mapping
+            set_scatter_plot(ax=temp_ax, df=data, y=y, x=x, by=by)
+            handles, labels = temp_ax.get_legend_handles_labels()
+            label_color_map = {label: handle.get_facecolor()[0] for label, handle in zip(labels, handles)}
+            plt.delaxes(temp_ax)  # remove temp axis
+
+            for i, cat in enumerate(data[by].unique()):
+                sub_data = data[data[by] == cat].copy()
+                if contamination > 0:
+                    clf = IsolationForest(contamination=contamination, random_state=42, n_estimators=200)
+                    sub_data['inlier'] = clf.fit_predict(sub_data[[y, x]])
+                else:
+                    sub_data['inlier'] = 1
+
+                X, y_act = sub_data[[x]], sub_data[y]
+                lr = LinearRegression()
+                lr.fit(X, y_act)
+                preds = lr.predict(X)
+
+                data.loc[sub_data.index, 'inlier'] = sub_data['inlier']
+                data.loc[sub_data.index, 'pred'] = preds
+
+                r2 = r2_score(y_act, preds)
+                rmse = mean_squared_error(y_act, preds, squared=False)
+                table.loc[len(table)] = [cat,len(sub_data),len(sub_data[sub_data['inlier'] == 1]),len(sub_data[sub_data['inlier'] == -1]),f"y = {lr.intercept_:.2f} + {lr.coef_[0]:.2f}*x",r2,rmse]
+
+                ax3.plot(X, preds, color=label_color_map.get(cat, 'black'), linewidth=1.5)
+
+        ax1 = fig.add_subplot(gs[0,0])  
+        set_dist_plot(ax=ax1,df=data[data.inlier == 1],y=x,by=by,stat='count',orient='v',category_stats=False,overall_stats=False)
+        ax1.axis('off')
+
+        ax2 = fig.add_subplot(gs[1,1])  
+        set_dist_plot(ax=ax2,df=data[data.inlier == 1],y=y,by=by,stat='count',orient='h',category_stats=False,overall_stats=False)
+        ax2.axis('off')
+
+        set_scatter_plot(ax=ax3,df=data[data.inlier == 1],y=y,x=x,by=by)
+        handles, labels = ax3.get_legend_handles_labels()
+        label_color_map = {label: handle.get_facecolor()[0] for label, handle in zip(labels, handles)}
+        #set_scatter_plot(ax=ax3,df=df[df.inlier==-1],y=y,x=x,by=by) # outliers    
+            
+        try:
+            ax3.legend_.remove()
+        except:
+            pass  
+
+        # legend
+        ax_legend = fig.add_subplot(gs[0, 1])
+        ax_legend.axis('off')
+        handles, labels = ax3.get_legend_handles_labels()
+        ax_legend.legend(handles, labels, loc='center',bbox_to_anchor=(1,1),fontsize=11,frameon=False)
+
+    #set_axes_style(ax=axs)
 
     return {
         'output':{'log':log,'plot':fig,'table':table},
@@ -938,17 +1136,24 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         except:
             f_stat, p_val = None,None    
 
-        return f'''
-                Analysis of Variance:
-                ---------------------
-                df = '{DATA_TABLE["file_name"]}'
-                y = '{y}' (Numeric tested column)
-                by = '{by}' (Predictor Categorical column)
-                Contamination = {contamination} (=Ignored % of data points)
+        anova_decision = None if y in ['None','none',None] or by in ['None','none',None] else 'Significant' if p_val < 0.05 else 'Not significant'    
+        decision_text = None if anova_decision == None else f"{by} effect on {y} is {anova_decision} (**ignoring {contamination*100}% of data)"
 
-                F-Statistic = {f_stat}
-                P-Value = {p_val}
-                '''
+        return textwrap.dedent(f"""\
+        Analysis of Variance:
+        ---------------------
+        df = '{DATA_TABLE["file_name"]}'
+        y = '{y}' (Numeric tested column)
+        by = '{by}' (Predictor Categorical column)
+        Contamination = {contamination} (=Ignored % of data points)
+
+        F-Statistic = {f_stat:.4f}
+        P-Value = {p_val:.4f}
+
+        Decision: {decision_text}
+        1. Null Hypothesis (H0): {by} has no effect on {y}
+        2. Alternative Hypothesis (H1): {by} has an effect on {y}
+        """)
     def get_stats(data:pd.Series):
         return {
             'count':len(data),
@@ -1000,10 +1205,13 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         ax.spines['bottom'].set_linewidth(1)
 
     TTEST_ALPHA = 0.05
-    OPACITY = 0.2
-    log = set_log(df,y,by,contamination)
+    OPACITY = 0.4
+    try:
+        log = set_log(df,y,by,contamination)
+    except:
+        log = 'No data to analyze'    
     HEIGHT = 1 if by in [None,'none','None'] else len(df[by].unique())
-    fig, ax = plt.subplots(figsize=(5,HEIGHT),dpi=75)
+    fig, ax = plt.subplots(figsize=(5,HEIGHT),dpi=80)
     set_axis_style(ax=ax,y=y,x=by,orient='h')
     
     if y in [None,'none','None']:
@@ -1084,12 +1292,14 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
     }
 def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0.03):
     def set_log(y,by,contamination):
-        return f'''
-        Outliers Detection:
-        df = '{DATA_TABLE["file_name"]}'
-        y = '{y}'
-        Contamination = {contamination}
-        '''
+        return textwrap.dedent(f'''\
+                Outliers Detection:
+                -------------------
+                df = '{DATA_TABLE["file_name"]}'
+                y = '{y}'
+                by = '{by}'
+                Contamination = {contamination}
+                ''')
     def set_data(df:pd.DataFrame,y:str=None,by:str=None,contamination=0.0):
         
         data = df[[y]].copy() if by in [None,'None','none'] else df[[y,by]].copy()
