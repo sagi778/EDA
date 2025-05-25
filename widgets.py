@@ -355,6 +355,30 @@ class ArgsMenu(QWidget):
         currrent_arg_string = cmd_string[cmd_string.find(arg_name)+len(arg_name):]
         print(f"currrent_arg_string = {currrent_arg_string}") # monitor
         return currrent_arg_string[currrent_arg_string.find('=')+1:get_next_end_indexes(string=currrent_arg_string)[0]]
+    def get_parameter_value(self, arg_name: str):
+        def get_next_end_indexes(string: str):
+            quat_open_flag = False
+            end_indexes = []
+            for i in range(len(string)):
+                if string[i] in ['"', "'"]:
+                    quat_open_flag = not quat_open_flag
+                elif string[i] in [',', ')'] and not quat_open_flag:
+                    end_indexes.append(i)
+            return end_indexes
+
+        cmd_string = self._cmd_block._cmd
+        current_arg_string = cmd_string[cmd_string.find(arg_name) + len(arg_name):]
+        print(f"current_arg_string = {current_arg_string}")
+
+        try:
+            start = current_arg_string.find('=') + 1
+            end_indexes = get_next_end_indexes(current_arg_string)
+            if not end_indexes:
+                return current_arg_string[start:].strip(" )")
+            return current_arg_string[start:end_indexes[0]].strip()
+        except Exception as e:
+            print(f"Error parsing parameter '{arg_name}': {e}")
+            return None
     def set_sql(self):
         # print(self.sql_arg.toPlainText()) # monitor
         query_string = self.sql_arg.toPlainText().replace('\n',' ')

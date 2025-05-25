@@ -220,10 +220,11 @@ def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table'):
             }
         }      
 def get_numerics_desc(df:pd.DataFrame,show='all',output_type:str='table'):
-    data = df.describe().T
+    data = df.describe([.005,.25,.5,.75,.995]).T
     numeric_columns = list(data.index)
     data['count'] = data['count'].astype(int)
     data["skewness"] = 3*(data['mean'] - data['50%'])/data['std']
+    data.rename(columns={'50%': 'median'}, inplace=True)
 
     if show != 'all':
         data = data[data.index == show]
@@ -854,8 +855,6 @@ def set_dist_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',ori
 
     if overall_stats in [True,'true','True']:
         set_stats(ax=ax,data=df[y],color='grey',style='--')
-
-    
 def set_count_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(ax.get_xlabel() , fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
@@ -904,8 +903,10 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:
     if by in ['None','none',None]:
         ax.scatter(
             df[x],df[y],
-            alpha=ALPHA,edgecolors=get_darker_color(CONFIG['Chart']['data_colors'][0],50),
-            s=POINT_SIZE, c=CONFIG['Chart']['data_colors'][0]
+            alpha=ALPHA,
+            edgecolors=color if color not in [None,'none','None'] else get_darker_color(CONFIG['Chart']['data_colors'][0],50),
+            s=POINT_SIZE, c=CONFIG['Chart']['data_colors'][0],
+            label="Outliers" if color not in [None,'none','None'] else None
         )
     else:
         for i,cat in enumerate(df[by].unique()):
@@ -913,9 +914,10 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:
             data = df.loc[df[by]==cat,[y,x,by]]
             ax.scatter(
                 data[x],data[y],
-                alpha=ALPHA,edgecolors=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],50),
+                alpha=ALPHA,
+                edgecolors=color if color not in [None,'none','None'] else get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],50),
                 s=POINT_SIZE, c=CONFIG['Chart']['data_colors'][COLOR_INDEX],
-                label=cat
+                label=f"{cat} Outliers" if color not in [None,'none','None'] else cat
             ) 
 
     try:
@@ -926,10 +928,10 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:
 
 # analysis 
 def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
-    def set_log(df,y,by,alpha,ct):
+    def set_log(df,y,by,alpha):
         ct = pd.crosstab(df[by], df[y])
         chi2, p, dof, expected = stats.chi2_contingency(ct)
-        return textwrap.dedent(f'''\
+        return textwrap.dedent(f"""\
                 Chi-Squared Analysis:
                 ---------------------
                 df = '{DATA_TABLE["file_name"]}'
@@ -946,25 +948,36 @@ def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
                 p-value = {p:.4f}
                 Degrees of Freedom (dof) = {dof}
                 Decision: {'Reject H0 (dependent)' if p < alpha else 'Fail to reject H0 (independent)'}
-                ''')
+                """)
     
-    ct = pd.crosstab(df[by], df[y])
-    chi2, p, dof, expected = stats.chi2_contingency(ct)
-    residuals = (ct - expected) / expected**0.5
-    log = set_log(df,y,by,alpha,ct)
+    fig, axes = plt.subplots(2,1, figsize=(30,4),dpi=80,constrained_layout=True)
+    ct = pd.DataFrame()
+    try:
+        log = set_log(df,y,by,alpha)
+    except:
+        log = 'Error: No data to analyze'
 
-    # Plots
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    if y not in [None,'none','None'] and by not in [None,'none','None']:
+        ct = pd.crosstab(df[by], df[y])
+        chi2, p, dof, expected = stats.chi2_contingency(ct)
+        residuals = (ct - expected) / expected**0.5
 
-    sns.heatmap(ct, annot=True, fmt='d', cmap='Blues', ax=axes[0])
-    axes[0].set_title('Observed Counts')
+        # data for plotting
+        obs = ct.reset_index().melt(id_vars=by, var_name=y, value_name='Count')
+        obs['Type'] = 'Observed'
 
-    sns.heatmap(pd.DataFrame(expected, index=ct.index, columns=ct.columns),
-                annot=True, fmt='.1f', cmap='Oranges', ax=axes[1])
-    axes[1].set_title('Expected Counts')
+        expected_df = pd.DataFrame(expected, index=ct.index, columns=ct.columns)
+        exp = expected_df.reset_index().melt(id_vars=by, var_name=y, value_name='Count')
+        exp['Type'] = 'Expected'
+        plot_df = pd.concat([obs, exp])
 
-    sns.heatmap(residuals, annot=True, fmt='.2f', center=0, cmap='coolwarm', ax=axes[2])
-    axes[2].set_title('Standardized Residuals')
+        #print(plot_df) # monitor
+        #sns.barplot(ax=axes[0],data=plot_df, x=by, y='Count', hue='Type', ci=None, palette='muted', dodge=True)
+        set_count_plot(ax=axes[0],df=plot_df,y='Count',by=by,orient='v')
+        axes[0].set_title('Observed vs Expected')
+
+        sns.heatmap(residuals, annot=True, fmt='.2f', center=0, cmap='coolwarm', ax=axes[1])
+        axes[1].set_title('Standardized Residuals')
 
     return {
         'output':{'log':log,'plot':fig,'table':ct},
@@ -985,7 +998,7 @@ def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
                 'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
                 'default':'None'
             },
-            alpha:{
+            'alpha':{
                 'type':'number',
                 'options':[0.01,0.05,0.1],
                 'default':0.05
@@ -1017,7 +1030,7 @@ def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,c
         if by in [None,'none','None']:
 
             data = df[[x,y]].copy()
-            data['pred'],data['inlier'] = None, None  # Initialize column
+            data['pred'],data['inlier'] = None, 1  # Initialize column
             if contamination > 0:
                 clf = IsolationForest(contamination=contamination, random_state=42, n_estimators=200)
                 data['inlier'] = clf.fit_predict(data[[y,x]])
@@ -1037,9 +1050,9 @@ def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,c
             set_scatter_plot(ax=ax3,df=reg_data,y=y,x=x,by=by) # inliers
             ax3.plot(X,reg_data['pred'], color='red',linewidth=1.5)
 
-        else:
+        else: # need to fix by category
             data = df[[x, y, by]].copy()
-            data['pred'], data['inlier'] = None, None  # Initialize column
+            data['pred'], data['inlier'] = None, 1  # Initialize column
             ax3 = fig.add_subplot(gs[1, 0]) 
 
             # --- Generate label_color_map before loop ---
@@ -1050,24 +1063,24 @@ def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,c
             plt.delaxes(temp_ax)  # remove temp axis
 
             for i, cat in enumerate(data[by].unique()):
-                sub_data = data[data[by] == cat].copy()
+                cat_data = data[data[by] == cat].copy()
                 if contamination > 0:
                     clf = IsolationForest(contamination=contamination, random_state=42, n_estimators=200)
-                    sub_data['inlier'] = clf.fit_predict(sub_data[[y, x]])
+                    cat_data['inlier'] = clf.fit_predict(cat_data[[y, x]])
                 else:
-                    sub_data['inlier'] = 1
+                    cat_data['inlier'] = 1
+                data.loc[cat_data.index, 'inlier'] = cat_data['inlier']
 
-                X, y_act = sub_data[[x]], sub_data[y]
+                reg_data = cat_data[cat_data.inlier == 1].copy()
+                X, y_act = reg_data[[x]], reg_data[y]
                 lr = LinearRegression()
                 lr.fit(X, y_act)
                 preds = lr.predict(X)
-
-                data.loc[sub_data.index, 'inlier'] = sub_data['inlier']
-                data.loc[sub_data.index, 'pred'] = preds
+                data.loc[reg_data.index, 'pred'] = preds
 
                 r2 = r2_score(y_act, preds)
                 rmse = mean_squared_error(y_act, preds, squared=False)
-                table.loc[len(table)] = [cat,len(sub_data),len(sub_data[sub_data['inlier'] == 1]),len(sub_data[sub_data['inlier'] == -1]),f"y = {lr.intercept_:.2f} + {lr.coef_[0]:.2f}*x",r2,rmse]
+                table.loc[len(table)] = [cat,len(cat_data),len(cat_data[cat_data['inlier'] == 1]),len(cat_data[cat_data['inlier'] == -1]),f"y = {lr.intercept_:.2f} + {lr.coef_[0]:.2f}*x",r2,rmse]
 
                 ax3.plot(X, preds, color=label_color_map.get(cat, 'black'), linewidth=1.5)
 
@@ -1082,7 +1095,7 @@ def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,c
         set_scatter_plot(ax=ax3,df=data[data.inlier == 1],y=y,x=x,by=by)
         handles, labels = ax3.get_legend_handles_labels()
         label_color_map = {label: handle.get_facecolor()[0] for label, handle in zip(labels, handles)}
-        #set_scatter_plot(ax=ax3,df=df[df.inlier==-1],y=y,x=x,by=by) # outliers    
+        set_scatter_plot(ax=ax3,df=data[data.inlier==-1],y=y,x=x,by=by,color='red') # outliers    
             
         try:
             ax3.legend_.remove()
@@ -1150,7 +1163,10 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         F-Statistic = {f_stat:.4f}
         P-Value = {p_val:.4f}
 
-        Decision: {decision_text}
+        +-----------------------------------------+
+        |Decision: {decision_text}|
+        +-----------------------------------------+
+        
         1. Null Hypothesis (H0): {by} has no effect on {y}
         2. Alternative Hypothesis (H1): {by} has an effect on {y}
         """)
@@ -1236,11 +1252,11 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
             )
         
         if by in [None,'none','None']:
-            set_box_plot(ax=ax,df=all_data,y=y,by=by,orient='h',overall_mean=True,category_mean=False,std_lines=True)
+            set_box_plot(ax=ax,df=inliers,y=y,by=by,orient='h',overall_mean=True,category_mean=False,std_lines=True)
             set_strip_plot(ax=ax,df=inliers,y=y,by=by,orient='h',opacity=OPACITY)
             set_strip_plot(ax=ax,df=outliers,y=y,by=by,orient='h',color='red',opacity=OPACITY)
         else:    
-            set_box_plot(ax=ax,df=all_data,y=y,by=by,orient='h',overall_mean=True,category_mean=True,std_lines=True)
+            set_box_plot(ax=ax,df=inliers,y=y,by=by,orient='h',overall_mean=True,category_mean=True,std_lines=True)
             set_strip_plot(ax=ax,df=inliers,y=y,by=by,orient='h',opacity=OPACITY)
 
             _, all_cat_inliers, _ = set_data(df=df,y=y,by=by,contamination=contamination)
@@ -1306,8 +1322,12 @@ def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0
         STATS = get_stats(data[y])
 
         if contamination > 0:
-            iso_forest = IsolationForest(n_estimators=200, contamination=contamination, random_state=42)
-            data['inlier'] = iso_forest.fit_predict(data[[y]])
+            distances = np.abs(data[y] - data[y].median())
+            n_outliers = int(len(data) * contamination)
+            data["inlier"] = 1
+            if n_outliers > 0:
+                outlier_idx = distances.nlargest(n_outliers).index
+                data.loc[outlier_idx, "inlier"] = -1
         else:
             data['inlier'] = 1    
 
