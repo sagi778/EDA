@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QVBoxLayout,QHBoxLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame
+from PyQt5.QtWidgets import QStackedLayout,QVBoxLayout,QHBoxLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame
 from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit
 
 from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor
@@ -333,7 +333,7 @@ class ArgsMenu(QWidget):
                                                 background-color: white;
                                             }}
                                         """)
-                self.sql_arg.setHtml(str(self.get_parameter_value(arg_name)))    
+                self.sql_arg.setHtml(str(self.get_parameter_value(arg_name)[1:-1]))    
                 self.sql_arg.textChanged.connect(self.set_sql)              
                 self.layout.addWidget(self.sql_arg)    
         
@@ -381,7 +381,7 @@ class ArgsMenu(QWidget):
             return None
     def set_sql(self):
         # print(self.sql_arg.toPlainText()) # monitor
-        query_string = self.sql_arg.toPlainText().replace('\n',' ')
+        query_string = '"' + self.sql_arg.toPlainText().replace('\n',' ').replace('"', "'") + '"'
         cmd = self._cmd_block.code_line._text
         query_end_index = min([cmd.find(c,cmd.find('query=') + len('query=') + 1) for c in [')','"',"'"]])
         old_query = cmd[cmd.find('query=') + len('query='):query_end_index]
@@ -658,64 +658,94 @@ class DataViewer(QWidget):
                 background: none; /* Hide arrows */
             }}
         """)
+        DATA_COMBO_STYLE = f"""
+                QComboBox {{
+                    font: {CONFIG['arguments']['font']};
+                    color: #3498db;
+                    padding: 1px 1px;
+                    border: 1px solid #3498db;
+                    border-radius: 5px;
+                    background-color: #f4fbff ;
+                    selection-background-color: #dedede;
+                }}
+                QComboBox::down-arrow {{
+                    border: none;
+                    background: none;
+                }}
+                QComboBox::drop-down {{
+                    border: none;
+                }}
+        """
         self.tabs.setIconSize(QSize(45,45))  # Set tab icon size
         self.tabs.setFixedWidth(1500)
         
         # Preview
-        self.preview_tab = QWidget()
-        self.preview_scroll = QScrollArea()
-        self.preview_scroll.setWidgetResizable(True)
-        self.preview_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.preview_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.preview_container = QWidget()
-        self.preview_tab_layout = QVBoxLayout()
-        self.preview_tab_layout.setAlignment(Qt.AlignTop)
-        self.preview_tab_layout.setSpacing(1)
-        self.preview_container.setLayout(self.preview_tab_layout)
-        self.preview_scroll.setWidget(self.preview_container)
-        self.tabs.addTab(self.preview_scroll, QIcon(f'{CURRENT_PATH}/icons/preview.png'), "Preview")
+        self.preview_main = QWidget()
+        self.preview_main_layout = QVBoxLayout()
+        self.preview_main_layout.setAlignment(Qt.AlignTop)
+        self.preview_main_layout.setSpacing(1)
+        self.preview_main.setLayout(self.preview_main_layout)
+        self.tabs.addTab(self.preview_main, QIcon(f'{CURRENT_PATH}/icons/preview.png'), "Preview")
+        self.preview_comb = QComboBox()
+        self.preview_comb.setFixedWidth(500)
+        self.preview_comb.setStyleSheet(DATA_COMBO_STYLE)
+        self.preview_comb.currentIndexChanged.connect(self.switch_preview_layout)
+        self.preview_main_layout.addWidget(self.preview_comb)
+        self.preview_stack = QWidget()
+        self.preview_stack_layout = QStackedLayout()
+        self.preview_stack.setLayout(self.preview_stack_layout)
+        self.preview_main_layout.addWidget(self.preview_stack)
 
         # SQL
-        self.sql_tab = QWidget()
-        self.sql_scroll = QScrollArea()
-        self.sql_scroll.setWidgetResizable(True)
-        self.sql_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.sql_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.sql_container = QWidget()
-        self.sql_tab_layout = QVBoxLayout()
-        self.sql_tab_layout.setAlignment(Qt.AlignTop)
-        self.sql_tab_layout.setSpacing(1)
-        self.sql_container.setLayout(self.sql_tab_layout)
-        self.sql_scroll.setWidget(self.sql_container)
-        self.tabs.addTab(self.sql_scroll, QIcon(f'{CURRENT_PATH}/icons/sql.png'), "SQL")
+        self.sql_main = QWidget()
+        self.sql_main_layout = QVBoxLayout()
+        self.sql_main_layout.setAlignment(Qt.AlignTop)
+        self.sql_main_layout.setSpacing(1)
+        self.sql_main.setLayout(self.sql_main_layout)
+        self.tabs.addTab(self.sql_main, QIcon(f'{CURRENT_PATH}/icons/sql.png'), "SQL")
+        self.sql_comb = QComboBox()
+        self.sql_comb.setFixedWidth(500)
+        self.sql_comb.setStyleSheet(DATA_COMBO_STYLE)
+        self.sql_comb.currentIndexChanged.connect(self.switch_sql_layout)
+        self.sql_main_layout.addWidget(self.sql_comb)
+        self.sql_stack = QWidget()
+        self.sql_stack_layout = QStackedLayout()
+        self.sql_stack.setLayout(self.sql_stack_layout)
+        self.sql_main_layout.addWidget(self.sql_stack)
 
         # Plots
-        self.plots_tab = QWidget()
-        self.plots_scroll = QScrollArea()
-        self.plots_scroll.setWidgetResizable(True)
-        self.plots_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.plots_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.plots_container = QWidget()
-        self.plots_tab_layout = QVBoxLayout()
-        self.plots_tab_layout.setAlignment(Qt.AlignTop)
-        self.plots_tab_layout.setSpacing(1)
-        self.plots_container.setLayout(self.plots_tab_layout)
-        self.plots_scroll.setWidget(self.plots_container)
-        self.tabs.addTab(self.plots_scroll, QIcon(f'{CURRENT_PATH}/icons/chart.png'), "Plots")
-        
+        self.plots_main = QWidget()
+        self.plots_main_layout = QVBoxLayout()
+        self.plots_main_layout.setAlignment(Qt.AlignTop)
+        self.plots_main_layout.setSpacing(1)
+        self.plots_main.setLayout(self.plots_main_layout)
+        self.tabs.addTab(self.plots_main, QIcon(f'{CURRENT_PATH}/icons/plots.png'), "Plots")
+        self.plots_comb = QComboBox()
+        self.plots_comb.setFixedWidth(500)
+        self.plots_comb.setStyleSheet(DATA_COMBO_STYLE)
+        self.plots_comb.currentIndexChanged.connect(self.switch_plots_layout)
+        self.plots_main_layout.addWidget(self.plots_comb)
+        self.plots_stack = QWidget()
+        self.plots_stack_layout = QStackedLayout()
+        self.plots_stack.setLayout(self.plots_stack_layout)
+        self.plots_main_layout.addWidget(self.plots_stack)
+
         # Analysis
-        self.analysis_tab = QWidget()
-        self.analysis_scroll = QScrollArea()
-        self.analysis_scroll.setWidgetResizable(True)
-        self.analysis_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.analysis_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.analysis_container = QWidget()
-        self.analysis_tab_layout = QVBoxLayout()
-        self.analysis_tab_layout.setAlignment(Qt.AlignTop)
-        self.analysis_tab_layout.setSpacing(1)
-        self.analysis_container.setLayout(self.analysis_tab_layout)
-        self.analysis_scroll.setWidget(self.analysis_container)
-        self.tabs.addTab(self.analysis_scroll, QIcon(f'{CURRENT_PATH}/icons/statistics.png'), "Analysis")
+        self.analysis_main = QWidget()
+        self.analysis_main_layout = QVBoxLayout()
+        self.analysis_main_layout.setAlignment(Qt.AlignTop)
+        self.analysis_main_layout.setSpacing(1)
+        self.analysis_main.setLayout(self.analysis_main_layout)
+        self.tabs.addTab(self.analysis_main, QIcon(f'{CURRENT_PATH}/icons/analysis.png'), "Analysis")
+        self.analysis_comb = QComboBox()
+        self.analysis_comb.setFixedWidth(500)
+        self.analysis_comb.setStyleSheet(DATA_COMBO_STYLE)
+        self.analysis_comb.currentIndexChanged.connect(self.switch_analysis_layout)
+        self.analysis_main_layout.addWidget(self.analysis_comb)
+        self.analysis_stack = QWidget()
+        self.analysis_stack_layout = QStackedLayout()
+        self.analysis_stack.setLayout(self.analysis_stack_layout)
+        self.analysis_main_layout.addWidget(self.analysis_stack)
 
         # Story
         self.story_tab = QWidget()
@@ -733,24 +763,76 @@ class DataViewer(QWidget):
         
         layout.addWidget(self.tabs)
         self.setLayout(layout)
-        #self.resize(400, 300)    
 
+    def switch_preview_layout(self, index):
+        self.preview_stack_layout.setCurrentIndex(index)
+    def switch_sql_layout(self, index):
+        self.sql_stack_layout.setCurrentIndex(index)     
+    def switch_plots_layout(self, index):
+        self.plots_stack_layout.setCurrentIndex(index)   
+    def switch_analysis_layout(self, index):
+        self.analysis_stack_layout.setCurrentIndex(index)       
     def set_preview(self):
-        print('[>] Setting up preview commands')
+        #print('[>] Setting up preview commands')
+        self.preview_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setSpacing(0)
+
         for cmd_string in COMMANDS['Preview']:
-            self.preview_tab_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))
+            content_layout.addWidget(CommandBlock(cmd=cmd_string, data=DATA_TABLE))
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(content_widget)
+        self.preview_stack_layout.addWidget(scroll_area)
     def set_sql(self):
-        print('[>] Setting up SQL commands')
+        #print('[>] Setting up SQL commands')
+        self.sql_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setSpacing(0)
+
         for cmd_string in COMMANDS['SQL']:
-            self.sql_tab_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))        
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))     
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(content_widget)
+        self.sql_stack_layout.addWidget(scroll_area)       
     def set_plots(self):
-        print('[>] Setting up plots commands')
+        #print('[>] Setting up plots commands')
+        self.plots_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setSpacing(0)
+
         for cmd_string in COMMANDS['Plots']:
-            self.plots_tab_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))          
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))     
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(content_widget)
+        self.plots_stack_layout.addWidget(scroll_area)           
     def set_analysis(self):
-        print('[>] Setting up analysis commands')
+        #print('[>] Setting up analysis commands')
+        self.analysis_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setSpacing(0)
+
         for cmd_string in COMMANDS['Analysis']:
-            self.analysis_tab_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))        
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))   
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(content_widget)
+        self.analysis_stack_layout.addWidget(scroll_area)            
 
 # file explorer
 class FileExplorer(QWidget):

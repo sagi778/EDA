@@ -330,7 +330,7 @@ def get_data(df:pd.DataFrame,output_type:str='table',show='100',query:str='SELEC
                     },
                 'show':{
                     'type':'category',
-                    'options':['10','25','50','100','200','all'],
+                    'options':['10','25','50','100','200',"'all'"],
                     'default':'100'
                 },    
                 'query':{
@@ -1150,7 +1150,7 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
             f_stat, p_val = None,None    
 
         anova_decision = None if y in ['None','none',None] or by in ['None','none',None] else 'Significant' if p_val < 0.05 else 'Not significant'    
-        decision_text = None if anova_decision == None else f"{by} effect on {y} is {anova_decision} (**ignoring {contamination*100}% of data)"
+        decision_text = None if anova_decision == None else f"{by} effect on {y} is {anova_decision}"
 
         return textwrap.dedent(f"""\
         Analysis of Variance:
@@ -1163,12 +1163,9 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         F-Statistic = {f_stat:.4f}
         P-Value = {p_val:.4f}
 
-        +-----------------------------------------+
+        +--------------------------------------------------------+
         |Decision: {decision_text}|
-        +-----------------------------------------+
-        
-        1. Null Hypothesis (H0): {by} has no effect on {y}
-        2. Alternative Hypothesis (H1): {by} has an effect on {y}
+        +--------------------------------------------------------+
         """)
     def get_stats(data:pd.Series):
         return {
