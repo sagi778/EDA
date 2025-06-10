@@ -3,13 +3,15 @@
         "get_shape(df=df,output_type='table')",
         "get_columns_info(df=df,show='all',output_type='table')",
         "get_preview(df=df,rows=5,end='head',output_type='table')",
+        "get_group_by(df=df,y=None,by=None,sub_cat=None,stats=['mean'],sort='descending',output_type='table')",
         "get_numerics_desc(df=df,show='all',output_type='table')",
-        "get_categorical_desc(df=df,show='all',outliers=None,output_type='table')"
+        "get_categorical_desc(df=df,show='all',outliers=0,output_type='table')"
     ],
     "SQL":[
         "get_data(df=df,output_type='table',show=100,query='SELECT * FROM df')"
     ],
     "Plots":[
+        "get_pie_plot(df=df,y=None,stat='percent')",
         "get_scatter_plot(df=df,y=None,x=None,by=None)",
         "get_box_plot(df=df,y=None,by=None,orient='v',overall_mean='False',category_mean='False',std_lines='False')",
         "get_count_plot(df=df,y=None,by=None,orient='h')",

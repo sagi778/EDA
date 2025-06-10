@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QStackedLayout,QVBoxLayout,QHBoxLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame
-from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit
+from PyQt5.QtWidgets import QStackedLayout,QVBoxLayout,QHBoxLayout,QFormLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame
+from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit,QListWidget,QListWidgetItem
 
-from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor
+from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor,QIntValidator,QDoubleValidator
 from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize,QPropertyAnimation,QObject,pyqtSignal,QThread, QEvent
 import sys
 import traceback
@@ -233,7 +233,7 @@ class CodeControls(QWidget):
     def set_save(self): 
         current_cmd_block = self.parent().parent()
         layout = current_cmd_block.parent().layout()
-        data_viewer = current_cmd_block.parent().parent().parent().parent().parent().parent()
+        data_viewer = current_cmd_block.parent().parent().parent().parent().parent().parent().parent().parent()
         story_layout = data_viewer.story_tab_layout
         story_layout.addWidget(current_cmd_block)
         story_layout.update()
@@ -267,12 +267,25 @@ class ArgsMenu(QWidget):
 
         self.layout = QVBoxLayout()
         self.layout.setContentsMargins(40,0,40,0)
-        self.layout.setAlignment(Qt.AlignLeft) 
+        #self.layout.setAlignment(Qt.AlignLeft) 
         
         for arg_name,arg in args.items():
             #print(f"arg_name={arg_name}; arg={arg}") # monitor
             if arg['type'] == 'category':
+                arg_layout, arg_label = QHBoxLayout(),QLabel(arg_name + ' =')
+                arg_label.setStyleSheet(
+                                        "QLabel {"
+                                        f"font: {CONFIG['CodeLine']['font']};"
+                                        f"color: {CONFIG['CodeLine']['color']};"
+                                        "padding: 0px 0px;"
+                                        "border: none;"
+                                        "}"
+                                    )
+                arg_layout.setAlignment(Qt.AlignLeft)
+                arg_layout.addWidget(arg_label)
+                
                 combo = QComboBox()
+                arg_layout.addWidget(combo)
                 combo.addItems(arg['options'])
                 #print(self.get_parameter_value(arg_name)) # monitor
                 combo.setCurrentText(self.get_parameter_value(arg_name))  # Set default selection
@@ -296,10 +309,24 @@ class ArgsMenu(QWidget):
                     "}"
                 )
                 combo.currentIndexChanged.connect(self.update_command)
-                self.layout.addWidget(combo)
+                self.layout.addLayout(arg_layout)
 
             elif arg['type'] == 'number':    
+                arg_layout, arg_label = QHBoxLayout(),QLabel(arg_name + ' =')
+                arg_label.setStyleSheet(
+                                        "QLabel {"
+                                        f"font: {CONFIG['CodeLine']['font']};"
+                                        f"color: {CONFIG['CodeLine']['color']};"
+                                        "padding: 0px 0px;"
+                                        "border: none;"
+                                        "}"
+                                    )
+                arg_layout.setAlignment(Qt.AlignLeft)
+                arg_layout.addWidget(arg_label)
+                arg_layout.addStretch()
+
                 int_arg = QLineEdit()
+                arg_layout.addWidget(int_arg)
                 #print(self.get_parameter_value(arg_name)) # monitor
                 int_arg.setText(str(self.get_parameter_value(arg_name)))  # Set default text
                 int_arg.setFixedWidth(min(MAX_ARG_WIDTH,max([12*len(str(item)) for item in arg['options']])))
@@ -315,7 +342,7 @@ class ArgsMenu(QWidget):
                     "}"
                 )
                 int_arg.textChanged.connect(self.update_command)
-                self.layout.addWidget(int_arg)
+                self.layout.addLayout(arg_layout)
 
             elif arg['type'] == 'query':    
                 self.sql_arg = QTextEdit()
@@ -440,6 +467,203 @@ class ArgsMenu(QWidget):
                 item.setText(current_arg)    
             elif isinstance(item,QTextEdit):
                 item.setHtml(current_arg)     
+class ArgsMenu(QWidget):
+    def __init__(self,args:dict,cmd_block=None):
+        super().__init__()
+        self.setObjectName("ArgsMenu")
+
+        self._args = {}
+        self._cmd_block = cmd_block
+        MAX_ARG_WIDTH = 220
+
+        self.form_layout = QFormLayout()
+        self.form_layout.setLabelAlignment(Qt.AlignRight)     # Align labels
+        self.form_layout.setFormAlignment(Qt.AlignTop)  
+        self.form_layout.setContentsMargins(40,0,40,0)
+
+        for arg_name,arg in args.items():
+            arg_label = QLabel(arg_name + ' =')
+            arg_label.setStyleSheet(
+                                        "QLabel {"
+                                        f"font: {CONFIG['CodeLine']['font']};"
+                                        f"color: {CONFIG['CodeLine']['color']};"
+                                        "padding: 0px 0px;"
+                                        "border: none;"
+                                        "}"
+                                    )
+
+            if arg['type'] == 'category':
+                combo = QComboBox()
+                combo.setStyleSheet(
+                    "QComboBox { "
+                    f"font: {CONFIG['arguments']['font']}; "
+                    "color: purple;"
+                    "padding: 1px 1px; "
+                    "border: 1px solid #dedede; "
+                    "border-radius: 5px; "
+                    f"background-color: #f9f0fa; "
+                    "selection-background-color: #dedede; "
+                    "}"
+                    "QComboBox::down-arrow {"
+                        "border: none;" 
+                        "background: none;" 
+                    "}"
+                    "QComboBox::drop-down {"
+                        "border: none;" 
+                    "}"
+                )
+                combo.addItems(arg['options'])
+                combo.setFixedWidth(min(MAX_ARG_WIDTH,20 + max([12*len(str(item)) for item in arg['options']])))
+                combo.currentIndexChanged.connect(self.update_command)
+                self.form_layout.addRow(arg_label,combo)
+            elif arg['type'] in ['integer','float']:
+                int_arg = QLineEdit()
+                int_arg.setValidator(QDoubleValidator() if arg['type'] == 'float' else QIntValidator())
+                int_arg.setText(str(self.get_parameter_value(arg_name)))  # Set default text
+                int_arg.setFixedWidth(min(MAX_ARG_WIDTH,max([12*len(str(item)) for item in arg['options']])))
+                int_arg.setStyleSheet(
+                                        "QLineEdit { "
+                                        f"font: {CONFIG['arguments']['font']}; "
+                                        "color: green;"
+                                        "padding: 1px 1px; "
+                                        "border: 1px solid #dedede; "
+                                        "border-radius: 5px; "
+                                        f"background-color: #f0faf7; "
+                                        "selection-background-color: #eafaf1; "
+                                        "}"
+                                    )
+                int_arg.textChanged.connect(self.update_command)                    
+                self.form_layout.addRow(arg_label,int_arg)    
+            elif arg['type'] == 'query':
+                self.sql_arg = QTextEdit()
+                self.sql_arg.setStyleSheet(f"""
+                                        QTextEdit {{
+                                                font:{CONFIG['CodeLine']['font']};
+                                                color:{CONFIG['CodeLine']['color']};
+                                                border: {CONFIG['CodeLine']['border']};
+                                                background-color: {CONFIG['CodeLine']['background-color']};
+                                                border-radius: 5px;
+                                                padding: 15px;
+                                            }}
+                                            QTextEdit:focus {{
+                                                border: 2px solid #3498db;
+                                                background-color: white;
+                                            }}
+                                        """)
+                self.sql_arg.setHtml(str(self.get_parameter_value(arg_name)[1:-1]))    
+                self.sql_arg.textChanged.connect(self.set_sql)  
+                self.form_layout.addRow(arg_label,self.sql_arg)
+            elif arg['type'] == 'items':
+                self.item_list = QListWidget()
+                self.item_list.setStyleSheet(
+                    f"""
+                    QListWidget {{
+                        background-color: None;
+                        border: None;
+                        padding: 3px;
+                        font: {CONFIG['CodeLine']['font']};
+                    }}
+
+                    """
+                )
+                self.item_list.setFlow(QListWidget.LeftToRight)
+                self.item_list.setWrapping(True)  # Allow wrapping if width is exceeded
+
+                for text_item in arg['options']:
+                    item = QListWidgetItem(text_item)
+                    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                    item.setCheckState(Qt.Unchecked)
+                    self.item_list.addItem(item)
+
+                self.form_layout.addRow(arg_label,self.item_list)    
+
+        self.setLayout(self.form_layout)
+
+    def get_parameter_value(self, arg_name: str):
+        def get_next_end_indexes(string: str):
+            quat_open_flag = False
+            end_indexes = []
+            for i in range(len(string)):
+                if string[i] in ['"', "'"]:
+                    quat_open_flag = not quat_open_flag
+                elif string[i] in [',', ')'] and not quat_open_flag:
+                    end_indexes.append(i)
+            return end_indexes
+
+        cmd_string = self._cmd_block._cmd
+        current_arg_string = cmd_string[cmd_string.find(arg_name) + len(arg_name):]
+        print(f"current_arg_string = {current_arg_string}")
+
+        try:
+            start = current_arg_string.find('=') + 1
+            end_indexes = get_next_end_indexes(current_arg_string)
+            if not end_indexes:
+                return current_arg_string[start:].strip(" )")
+            return current_arg_string[start:end_indexes[0]].strip()
+        except Exception as e:
+            print(f"Error parsing parameter '{arg_name}': {e}")
+            return None
+    def set_sql(self):
+        # print(self.sql_arg.toPlainText()) # monitor
+        query_string = '"' + self.sql_arg.toPlainText().replace('\n',' ').replace('"', "'") + '"'
+        cmd = self._cmd_block.code_line._text
+        query_end_index = min([cmd.find(c,cmd.find('query=') + len('query=') + 1) for c in [')','"',"'"]])
+        old_query = cmd[cmd.find('query=') + len('query='):query_end_index]
+        #self._cmd_block.code_line.set_text(f"old_query = {old_query} >> new query = {query_string}") # monitor
+        self._cmd_block.code_line.set_text(cmd.replace(old_query,query_string))
+    def update_command(self):      
+        def set_new_parameters_to_cmd(cmd:str,args:ArgsMenu) -> str:
+            def delete_func_parameters(cmd:str): 
+                new_cmd = []
+                delete_flag = False
+                for char in cmd:
+                    if char in ['=',',',')']:
+                        delete_flag = not delete_flag
+                    elif delete_flag == True:
+                        new_cmd += ''
+                        continue
+                    new_cmd += char        
+
+                return ''.join(new_cmd)
+            def get_new_parameters(args:ArgsMenu): 
+                param = []
+                for item in args.children():
+                    #print(item)
+                    if isinstance(item, QComboBox):
+                        #print(f'QComboBox = {item.currentText()}')
+                        param.append(item.currentText())
+                    elif isinstance(item, QLineEdit):
+                        #print(f'QLineEdit = {item.text()}')   
+                        param.append(item.text()) 
+                    elif isinstance(item, QTextEdit):
+                        #print(f'QTextEdit = {item.toPlainText()}')   
+                        param.append(item.toPlainText())     
+
+                return param 
+
+            cmd_string = delete_func_parameters(cmd)
+            for item in get_new_parameters(args):
+                cmd_string = cmd_string.replace('=',f"@{item}",1)
+                #print(cmd_string)
+
+            return cmd_string.replace('@','=')   
+
+        #print('update command') # monitor
+        # set code line
+        code_line = self.parent().findChild(CodeLine)
+        code_line.set_text(set_new_parameters_to_cmd(cmd=code_line._text,args=self))
+        code_line._current_args = code_line.get_current_parameters(code_line.line.text())
+
+        # set arguments fields
+        #print(self.children()[1:])
+        for item,current_arg in zip(self.children()[1:],code_line._current_args.values()):
+            #print(f"item={item}, current_arg={current_arg}") # monitor
+            if isinstance(item,QComboBox):
+                item.setCurrentText(current_arg)
+            elif isinstance(item,QLineEdit):
+                item.setText(current_arg)    
+            elif isinstance(item,QTextEdit):
+                item.setHtml(current_arg)      
 class Comment(QWidget):
     def __init__(self, expanded_height=80, duration=500):
         super().__init__()

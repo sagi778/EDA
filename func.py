@@ -139,7 +139,7 @@ def get_shape(df:pd.DataFrame,output_type:str='table'):
                 }
                 }
         }  
-def get_preview(df:pd.DataFrame,rows=5,end='head',output_type:str='table'):
+def get_preview(df:pd.DataFrame,rows:int=5,end:str='head',output_type:str='table'):
     
     if rows >= len(df):
         data = df 
@@ -164,7 +164,7 @@ def get_preview(df:pd.DataFrame,rows=5,end='head',output_type:str='table'):
                 'default':f"'df'"
             },
             'rows':{
-                'type':'number',
+                'type':'integer',
                 'options':[3,5,10,25],
                 'default':5
             },
@@ -296,7 +296,7 @@ def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:
                 'default':f"'all'"
                 },
             'outliers':{
-                'type':'number',
+                'type':'float',
                 'options':[0.3,0.5,1,3,5,10],
                 'default':0.3
             },
@@ -307,6 +307,68 @@ def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:
             }
         }
     }    
+def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats:[]=['mean'],sort:str='descending',output_type:str='table'):
+    
+    metrics = [stats]
+
+    try:
+        if y not in [None,'none','None']:
+            if sub_cat in [None,'none','None']:
+                data = df.groupby(by=[by]).agg({y:stat for stat in metrics})
+            else:
+                data = df.groupby(by=[by,sub_cat]).agg({y:stat for stat in metrics})   
+
+            # Rename only if MultiIndex (i.e., multiple metrics)
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = [f'{col}.{func}()' for col, func in data.columns]
+            else:
+                data.columns = [f'{y}.{metrics[0]}()']
+        else:
+            data = pd.DataFrame(data={'Error':['y is None']})    
+    except Exception as e: 
+        print(e)   
+
+    return {
+        'output':data,
+        'output_type':output_type,
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=int(0.1*len(df)))],
+                'default':"'None'"
+                },
+            'by':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':"'None'"
+                },
+            'sub_cat':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':"'None'"
+                },    
+            'stats':{
+                'type':'items',
+                'options':["'count'","'sum'","'mean'","'median'","'std'","'min'","'max'"],
+                'default':["'mean'"]
+            },
+            'sort':{
+                'type':'category',
+                'options':["'ascending'","'descending'",],
+                'default':"'descending'"
+            },
+            'output_type':{
+                'type':'category',
+                'options':["'table'","'text'"],
+                'default':"'table'"
+            }
+        }
+    } 
 
 # sql
 def get_data(df:pd.DataFrame,output_type:str='table',show='100',query:str='SELECT * FROM df'):
@@ -590,6 +652,37 @@ def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient
                 'type':'category',
                 'options':['"False"','"True"'],
                 'default':'"False"'
+            }
+        }
+    }
+def get_pie_plot(df:pd.DataFrame,y:str=None,stat:str='percent'):
+    
+    fig, ax = plt.subplots(figsize=(5,5),dpi=75)
+
+    try:
+        set_pie_plot(ax=ax,df=df,y=y,stat=stat)
+    except Exception as e:
+        print(e)    
+    
+    return {
+        'output':fig,
+        'size':(300,700),
+        'output_type':'plot',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':None
+            },
+            'stat':{
+                'type':'category',
+                'options':[f"'count'",f"'percent'"],
+                'default':f"'percent'"
             }
         }
     }
@@ -925,6 +1018,22 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:
     except:
         pass    
     set_axis_style(ax=ax,y=y,x=x)
+def set_pie_plot(ax,df:pd.DataFrame,y:str=None,stat:str=['percent','count']):
+    def count_autopct(pct):
+        total = sum(counts)
+        count = int(round(pct * total / 100.0))
+        return f'{count}'
+
+    ax.pie(
+        df[y].value_counts(),
+        labels=df[y].value_counts().index, 
+        colors=CONFIG['Chart']['data_colors'],
+        autopct="%1.1f%%",
+        radius=1,
+        pctdistance=1.3, labeldistance=1.5,
+        wedgeprops={"linewidth": 1, "edgecolor": CONFIG['Chart']['frame_color']}, 
+        frame=False
+        )
 
 # analysis 
 def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
@@ -999,7 +1108,7 @@ def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
                 'default':'None'
             },
             'alpha':{
-                'type':'number',
+                'type':'float',
                 'options':[0.01,0.05,0.1],
                 'default':0.05
             }
@@ -1135,7 +1244,7 @@ def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,c
                 'default':'None'
             },
             'contamination':{
-                'type':'number',
+                'type':'float',
                 'options':[0.03,0.05,0.1],
                 'default':0.03
             }
@@ -1193,11 +1302,13 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         data = df[[y]].copy() if by in [None,'None','none'] else df[[y,by]].copy()
         STATS = get_stats(data[y])
 
+        data["inlier"] = 1
         if contamination > 0:
-            iso_forest = IsolationForest(n_estimators=200, contamination=contamination, random_state=42)
-            data['inlier'] = iso_forest.fit_predict(data[[y]])
-        else:
-            data['inlier'] = 1    
+            distances = np.abs(data[y] - data[y].median())
+            n_outliers = int(len(data) * contamination)
+            if n_outliers > 0:
+                outlier_idx = distances.nlargest(n_outliers).index
+                data.loc[outlier_idx, "inlier"] = -1   
 
         outliers = data.loc[data['inlier']==-1,:].drop('inlier', axis=1).copy()
         inliers = data.loc[data['inlier']==1,:].drop('inlier', axis=1).copy()
@@ -1254,9 +1365,9 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
             set_strip_plot(ax=ax,df=outliers,y=y,by=by,orient='h',color='red',opacity=OPACITY)
         else:    
             set_box_plot(ax=ax,df=inliers,y=y,by=by,orient='h',overall_mean=True,category_mean=True,std_lines=True)
-            set_strip_plot(ax=ax,df=inliers,y=y,by=by,orient='h',opacity=OPACITY)
 
             _, all_cat_inliers, _ = set_data(df=df,y=y,by=by,contamination=contamination)
+            set_strip_plot(ax=ax,df=all_cat_inliers,y=y,by=by,orient='h',opacity=OPACITY)
             for cat in df[by].unique():
                 all_data, inliers, outliers = set_data(df=df.loc[df[by]==cat,[y,by]],y=y,by=by,contamination=contamination)
                 STATS = get_stats(all_data[y])
@@ -1297,7 +1408,7 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
                 'default':'None'
             },
             'contamination':{
-                'type':'number',
+                'type':'float',
                 'options':[0.03,0.05,0.1],
                 'default':0.03
             }
@@ -1440,7 +1551,7 @@ def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0
                 'default':'None'
             },
             'contamination':{
-                'type':'number',
+                'type':'float',
                 'options':[0.03,0.05,0.1],
                 'default':0.03
             }
