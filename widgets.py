@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QStackedLayout,QVBoxLayout,QHBoxLayout,QFormLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame
-from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit,QListWidget,QListWidgetItem
+from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit,QListWidget,QListWidgetItem,QAbstractItemView
 
 from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor,QIntValidator,QDoubleValidator
 from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize,QPropertyAnimation,QObject,pyqtSignal,QThread, QEvent
@@ -555,6 +555,7 @@ class ArgsMenu(QWidget):
                 self.form_layout.addRow(arg_label,self.sql_arg)
             elif arg['type'] == 'items':
                 self.item_list = QListWidget()
+                self.item_list.setSelectionMode(QAbstractItemView.MultiSelection)
                 self.item_list.setStyleSheet(
                     f"""
                     QListWidget {{
@@ -575,6 +576,7 @@ class ArgsMenu(QWidget):
                     item.setCheckState(Qt.Unchecked)
                     self.item_list.addItem(item)
 
+                self.item_list.itemChanged.connect(self.update_command)
                 self.form_layout.addRow(arg_label,self.item_list)    
 
         self.setLayout(self.form_layout)
@@ -584,21 +586,22 @@ class ArgsMenu(QWidget):
             quat_open_flag = False
             end_indexes = []
             for i in range(len(string)):
-                if string[i] in ['"', "'"]:
+                if string[i] in ['[','"', "'"]:
                     quat_open_flag = not quat_open_flag
-                elif string[i] in [',', ')'] and not quat_open_flag:
+                elif string[i] in [']',',', ')'] and not quat_open_flag:
                     end_indexes.append(i)
             return end_indexes
 
         cmd_string = self._cmd_block._cmd
         current_arg_string = cmd_string[cmd_string.find(arg_name) + len(arg_name):]
-        print(f"current_arg_string = {current_arg_string}")
+        #print(f"current_arg_string = {current_arg_string}")
 
         try:
             start = current_arg_string.find('=') + 1
             end_indexes = get_next_end_indexes(current_arg_string)
             if not end_indexes:
                 return current_arg_string[start:].strip(" )")
+            print(f"parameter_value = {current_arg_string[start:end_indexes[0]]}") # monitor
             return current_arg_string[start:end_indexes[0]].strip()
         except Exception as e:
             print(f"Error parsing parameter '{arg_name}': {e}")
@@ -638,6 +641,10 @@ class ArgsMenu(QWidget):
                     elif isinstance(item, QTextEdit):
                         #print(f'QTextEdit = {item.toPlainText()}')   
                         param.append(item.toPlainText())     
+                    elif isinstance(item, QListWidget):
+                        selected_items = []
+                        selected_items = [item.item(i).text() for i in range(item.count()) if item.item(i).checkState() == Qt.Checked]
+                        param.append(selected_items)    
 
                 return param 
 
@@ -852,11 +859,13 @@ class DataViewer(QWidget):
             QTabBar::tab:selected {{ 
                 background: {CONFIG['DataViewer']['selected-tab-color']}; 
                 font: 14px Consolas;
+                border-color: {get_darker_color(CONFIG['DataViewer']['selected-tab-color'],30)};
                 color: {CONFIG['FileExplorer']['color']}; 
                 font-weight: bold; 
             }}
             QTabBar::tab:hover {{
                 color: {CONFIG['FileExplorer']['color']}; 
+                border-width: 2px;
                 background-color: {CONFIG['DataViewer']['hover-color']};
             }}
             QScrollArea {{

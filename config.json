@@ -20,7 +20,7 @@
     "DataViewer":{
         "border":"1px solid #dedede",
         "hover-color":"#f4f4f4",
-        "selected-tab-color":"white",
+        "selected-tab-color":"#ebf5fb",
         "unselected-tab-color":"#616a6b"
     },
     "Chart":{

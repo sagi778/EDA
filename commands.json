@@ -18,6 +18,7 @@
         "get_dist_plot(df=df,y=None,by=None,stat='count',orient='v',category_stats='True',overall_stats='False')"
     ],
     "Analysis":[
+        "get_timeseries_analysis(df=df,y=None,x=None,training_size=0.8)",
         "get_correlation_analysis(df=df,y=None,x=None,by=None,contamination=0.03)",
         "get_anova_analysis(df=df,y=None,by=None,contamination=0.03)",
         "get_outliers_analysis(df=df,y=None,by=None,contamination=0.03)",

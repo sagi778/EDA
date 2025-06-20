@@ -21,6 +21,7 @@ from scipy import stats
 from scipy.stats import linregress,gaussian_kde,shapiro,ttest_ind
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import mean_squared_error
+from prophet import Prophet
 
 # basic func
 def get_dir(directory):
@@ -181,7 +182,7 @@ def get_preview(df:pd.DataFrame,rows:int=5,end:str='head',output_type:str='table
         }
         }
 def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table'): 
-    data = {'column':[],'type':[],'dtype':[],'unique':[],'Non-Nulls':[],'Non-Nulls%':[]}
+    data = {'column':[],'type':[],'dtype':[],'unique':[],'Non-Nulls':[],'Nulls':[],'Non-Nulls%':[],'Nulls%':[]}
     numeric_cols = df.select_dtypes(include=['number'])
     object_cols = df.select_dtypes(include=['object'])
     for column in df.columns:
@@ -189,8 +190,10 @@ def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table'):
         data['type'].append('number' if column in numeric_cols else 'object')
         data['dtype'].append(str(df[column].dtype))
         data['unique'].append(len(df[column].unique().tolist()))
-        data['Non-Nulls'].append(len(df[~df[column].isna()]))
-        data['Non-Nulls%'].append(f"{round(len(df[~df[column].isna()])*100/len(df),2)}%")
+        data['Non-Nulls'].append(len(df[~df[column].isna()])),
+        data['Nulls'].append(len(df[df[column].isna()])),
+        data['Non-Nulls%'].append(f"{round(len(df[~df[column].isna()])*100/len(df),2)}%"),
+        data['Nulls%'].append(f"{round(len(df[df[column].isna()])*100/len(df),2)}%")
 
     data = pd.DataFrame(data).sort_values(by=['type','dtype','Non-Nulls']).reset_index(drop=True)  
 
@@ -307,24 +310,15 @@ def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:
             }
         }
     }    
-def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats:[]=['mean'],sort:str='descending',output_type:str='table'):
+def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=['mean'],sort:str='descending',output_type:str='table'):
     
-    metrics = [stats]
+    data = pd.DataFrame(data={'y':[f'error: y = {y}'],'by':[f'error: by = {by}'],sub_cat:[f'error: sub_cat = {sub_cat}']})  
 
-    try:
-        if y not in [None,'none','None']:
-            if sub_cat in [None,'none','None']:
-                data = df.groupby(by=[by]).agg({y:stat for stat in metrics})
-            else:
-                data = df.groupby(by=[by,sub_cat]).agg({y:stat for stat in metrics})   
-
-            # Rename only if MultiIndex (i.e., multiple metrics)
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = [f'{col}.{func}()' for col, func in data.columns]
-            else:
-                data.columns = [f'{y}.{metrics[0]}()']
-        else:
-            data = pd.DataFrame(data={'Error':['y is None']})    
+    try:        
+        group_columns = [by] if sub_cat in [None,'none','None'] else [by,sub_cat]
+        statistics = {y:[stat for stat in stats]}
+        data = df.groupby(by=group_columns).agg(statistics)
+           
     except Exception as e: 
         print(e)   
 
@@ -354,8 +348,8 @@ def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats:[
                 },    
             'stats':{
                 'type':'items',
-                'options':["'count'","'sum'","'mean'","'median'","'std'","'min'","'max'"],
-                'default':["'mean'"]
+                'options':["count","sum","mean","median","std","min","max"],
+                'default':["mean"]
             },
             'sort':{
                 'type':'category',
@@ -1036,6 +1030,69 @@ def set_pie_plot(ax,df:pd.DataFrame,y:str=None,stat:str=['percent','count']):
         )
 
 # analysis 
+def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:float=0.8):
+    def set_log(df,y,x):
+        return textwrap.dedent(f"""\
+        Time Series Analysis:
+        ---------------------
+        df = '{DATA_TABLE["file_name"]}'
+        y  = '{y}' 
+        x  = '{x}' 
+    """)
+
+    fig, axes = plt.subplots(4,1,figsize=(5,25), dpi=80,constrained_layout=True)
+    table = pd.DataFrame()
+
+    x = df.index if x in [None,'none','None','index'] else x
+
+    try:
+        log = set_log(df=df,y=y,x=x)
+        components = ['trend', 'weekly', 'yearly']
+        df[x] = pd.to_datetime(df[x]) if x not in [None,'none','None'] else df.index
+        data = df[[x,y]].rename(columns={x:'ds',y:'y'},inplace=False).copy()
+        train = data.iloc[:int(len(data) * training_size)]
+        test = data.iloc[int(len(data) * training_size):]
+        model = Prophet()
+        model.fit(train)
+        future = model.make_future_dataframe(periods=len(test), freq='D')
+        forecast = model.predict(future)
+
+        axes[0].plot(components['ds'], components['trend'], label='Trend')
+        axes[0].set_title('Trend')
+        axes[0].grid(True)
+
+    except Exception as e:    
+        log = e
+
+    return {
+        'output':{'log':log,'plot':fig,'table':table},
+        'output_type':'analysis',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=10)],
+                'default':None
+            },
+            'x':{
+                'type':'category',
+                'options':['index'] + [f"'{item}'" for item in df.select_dtypes(include=['datetime', 'datetimetz']).columns.tolist()],
+                'default':'index'
+            },
+            'training_size':{
+                'type':'float',
+                'options':[0.9,0.8,0.7,0.6,0.5],
+                'default':0.8
+            }
+        }
+    }
+    
+
+    
 def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
     def set_log(df,y,by,alpha):
         ct = pd.crosstab(df[by], df[y])
