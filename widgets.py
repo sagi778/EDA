@@ -768,11 +768,15 @@ class CommandBlock(QWidget):
         
         # Main layout
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.setAlignment(Qt.AlignTop)
         self.main_layout.setSpacing(0)
         self.layout.setAlignment(Qt.AlignTop)
         self.layout.setSpacing(0)
         self.main_layout.addWidget(self.block)
+        
 
+        #self.layout.addStretch()
+        #self.main_layout.addStretch()
         self.setLayout(self.main_layout)
     
     def get_attributes(self):
@@ -807,14 +811,14 @@ class CommandBlock(QWidget):
             elif output_obj['output_type'] == 'table':
                 self._output = TableOutput(output_obj['output'])
             elif output_obj['output_type'] == 'plot':  
-                self._output = PlotOutput(fig=output_obj['output'],height=output_obj['size'][1],width=output_obj['size'][0])      
+                self._output = PlotOutput(fig=output_obj['output'],height=int(100*output_obj['output'].get_size_inches()[0]),width=int(100*output_obj['output'].get_size_inches()[0]))      
             elif output_obj['output_type'] == 'analysis':  
                 self._output = AnalysisOutput(
                     plot=output_obj['output']['plot'],
                     log=output_obj['output']['log'],
                     table=output_obj['output']['table']
                     )  
-                self._output.setGeometry(0,0,1000,700)    
+                #self._output.setGeometry(0,0,1000,700)    
         
         except Exception:
             #pass # use for full exception in vscode
@@ -1238,7 +1242,7 @@ class PlotOutput(QWidget):
         """
 
         self.setStyleSheet("background-color: white; border: 2px solid #333;")
-        self.setFixedSize(self._height,self._width)
+        #self.setFixedSize(self._height,self._width)
         
         self.layout = QVBoxLayout()
 

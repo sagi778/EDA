@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.gridspec as gridspec
 import duckdb
 from tabulate import tabulate
+import calendar
 import os
 import json
 import re
@@ -22,6 +23,7 @@ from scipy.stats import linregress,gaussian_kde,shapiro,ttest_ind
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import mean_squared_error
 from prophet import Prophet
+from prophet.diagnostics import cross_validation, performance_metrics
 
 # basic func
 def get_dir(directory):
@@ -417,38 +419,44 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
         try:
             if orient == 'v':
                 max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
-                return min(max(350,2*max_data_to_category),600)
+                return min(max(3,2*max_data_to_category),6)
             elif orient == 'h':
-                return min(max(350,num_of_categories*20),600)
+                return min(max(3,num_of_categories*20),9)
         except:    
-            return 300        
+            return 3        
     def set_width(df=df,by=by,orient=orient,num_of_categories:int=5):
         try:
             if orient == 'h':
                 max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
-                return min(max(300,2*max_data_to_category),600)
+                return min(max(3,2*max_data_to_category),6)
             elif orient == 'v':
-                return min(max(200,num_of_categories*20),600)
+                return min(max(3,num_of_categories*2),9)
         except:        
-            return 300 
+            return 3 
         
     MAX_CATEGORIES = 30
+    LEGEND_SIZE = 1
     NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else min(len(df[by].unique()),MAX_CATEGORIES)
     HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
-    #print(f"height: {HEIGHT}, width: {WIDTH}") # monitor
 
-    fig, ax = plt.subplots(figsize=(HEIGHT,WIDTH),dpi=75)
+    fig, ax = plt.subplots(figsize=(HEIGHT,LEGEND_SIZE + WIDTH),dpi=80)
     set_axis_style(ax=ax,y=y,x=by,orient=orient)
-
+    
     try:
         set_strip_plot(ax=ax,df=df,y=y,by=by,orient=orient,color=None)
         set_box_plot(ax=ax,df=df,y=y,by=by,orient=orient,overall_mean=overall_mean,category_mean=category_mean,std_lines=std_lines)
+        ax.legend(
+            bbox_to_anchor=(1.02, 1),  # x=1.02 (just outside right), y=1 (top)
+            loc='upper left',          # anchor the upper left of the legend to this point
+            borderaxespad=0
+        )
+        #fig.tight_layout()
     except Exception as e:
         print(e)    
     
     return {
         'output':fig,
-        'size':(HEIGHT,WIDTH),
+        'size':(HEIGHT,LEGEND_SIZE + WIDTH),
         'output_type':'plot',
         'args':{
             'df':{
@@ -497,20 +505,20 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
             try:
                 if orient == 'v':
                     max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
-                    return min(max(300,2*max_data_to_category),600)
+                    return min(max(5,2*max_data_to_category),10)
                 elif orient == 'h':
-                    return min(max(200,num_of_categories*20),600)
+                    return min(max(5,num_of_categories*2),15)
             except:    
-                return 300        
+                return 5        
     def set_width(df=df,by=by,orient=orient,num_of_categories:int=5):
             try:
                 if orient == 'h':
                     max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
-                    return min(max(300,2*max_data_to_category),600)
+                    return min(max(5,2*max_data_to_category),10)
                 elif orient == 'v':
-                    return min(max(200,num_of_categories*20),600)
+                    return min(max(5,num_of_categories*2),15)
             except:        
-                return 300 
+                return 5 
         
     NUM_OF_CATEGORIES = get_num_of_categories(df,y,by)
     HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
@@ -561,7 +569,7 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
     POINT_SIZE = 5 if len(df) > 1000 else 8 if len(df) > 200 else 9
     ALPHA = 0.2 if len(df) > 1000 else 0.4 if len(df) > 200 else 0.6
     
-    fig, ax = plt.subplots(figsize=(5,POINT_SIZE),dpi=75)
+    fig, ax = plt.subplots(figsize=(5,POINT_SIZE),dpi=80)
     set_axis_style(ax,y,x)
 
     try:
@@ -596,6 +604,51 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
             }
         }
     }
+def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
+    def set_axis_style(ax,y:str,x:str):
+        ax.set_xlabel(x, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
+        ax.set_ylabel(y, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
+        ax.tick_params(axis='x',labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        ax.tick_params(axis='y', labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+    
+    fig, ax = plt.subplots(figsize=(5,10),dpi=80)
+    set_axis_style(ax,y,x)
+
+    try:
+        set_line_plot(ax=ax,df=df,y=y,x=x,by=by)
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
+    except Exception as e:
+        print(e)    
+    
+    return {
+        'output':fig,
+        'size':(500,1150),
+        'output_type':'plot',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=int(0.1*len(df)))],
+                'default':None
+            },
+            'x':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=int(0.1*len(df)))],
+                'default':'None'
+            },
+            'by':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':'None'
+            }
+        }
+    }
 def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient='h',category_stats=True,overall_stats=False):
     def get_num_of_categories(df:pd.DataFrame=df,y:str=y,by:str=by):
         y_amount = 1 if y in [None,'none','None'] else len(df[y].unique())
@@ -603,7 +656,7 @@ def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient
         return y_amount*by_amount
 
     NUM_OF_CATEGORIES = get_num_of_categories(df,y,by)
-    fig, ax = plt.subplots(figsize=(1,NUM_OF_CATEGORIES),dpi=75)
+    fig, ax = plt.subplots(figsize=(5,5*NUM_OF_CATEGORIES),dpi=80)
     
     set_dist_plot(ax=ax,df=df,y=y,by=by,stat=stat,orient=orient,category_stats=category_stats,overall_stats=overall_stats)
 
@@ -753,7 +806,7 @@ def set_strip_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',color:st
                     )        
 
     #set_axis_style(ax,y,by)
-def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_mean=True,category_mean=True,std_lines:bool=True):
+def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_mean=True,category_mean=True,std_lines:bool=True,confidence_lines:bool=False):
     def set_axis_style(ax,y:str,x:str,orient=orient):
         if orient == 'v':
             ax.set_xlabel(x, fontsize=12, fontfamily=CONFIG['Chart']['font'], color=CONFIG['Chart']['font_color'])
@@ -822,6 +875,40 @@ def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_me
                     ax.plot([cat,cat],[overall_mean,df.loc[df[by]==cat,y].mean()],color='red')
                 elif orient == 'h':   
                     ax.plot([overall_mean,df.loc[df[by]==cat,y].mean()],[cat,cat],color='red') 
+    def set_confidence_lines(ax=ax,df:pd.DataFrame=df,y:str=y,by:str=by,confidence_lines:bool=confidence_lines):
+        
+        MEAN_POINT_SIZE = 80
+        STAT_COLOR = 'red' #00ff8f' #light green
+        
+        if by in [None,'none','None']:
+            MEAN, LINE05, LINE95 = df[y].mean(), df[y].quantile(0.05), df[y].quantile(0.95)
+            if orient == 'h':
+                ax.scatter(x=MEAN,y=y,color=STAT_COLOR,marker='x',s=MEAN_POINT_SIZE)
+                if confidence_lines in [True,'true','True']:
+                    MARKER = '|'
+                    ax.scatter(x=[LINE95,LINE05],y=[y,y],color=STAT_COLOR,edgecolors=get_darker_color(STAT_COLOR,30),marker=MARKER,s=MEAN_POINT_SIZE)
+            elif orient == 'v':
+                ax.scatter(y=MEAN,x=y,color=STAT_COLOR,marker='x',s=MEAN_POINT_SIZE)
+                if confidence_lines in [True,'true','True']:
+                    MARKER = '_'
+                    ax.scatter(y=[LINE95,LINE05],x=[y,y],color=STAT_COLOR,edgecolors=get_darker_color(STAT_COLOR,30),marker=MARKER,s=MEAN_POINT_SIZE)
+        else:
+            mean_dict = dict(zip(df[by].unique().tolist(),[df.loc[df[by]==cat,y].mean() for cat in df[by].unique()]))
+            line05_dict = dict(zip(df[by].unique().tolist(),[df.loc[df[by]==cat,y].quantile(0.05) for cat in df[by].unique()]))
+            line95_dict = dict(zip(df[by].unique().tolist(),[df.loc[df[by]==cat,y].quantile(0.95) for cat in df[by].unique()]))
+
+            if orient == 'h':
+                ax.scatter(x=mean_dict.values(),y=mean_dict.keys(),color=STAT_COLOR,marker='x',s=MEAN_POINT_SIZE)
+                if confidence_lines in [True,'true','True']:  
+                    #MARKER = '|'
+                    ax.scatter(x=line05_dict.values(),y=line05_dict.keys(),color=STAT_COLOR,marker='<',edgecolors=get_darker_color(STAT_COLOR,30),s=MEAN_POINT_SIZE)
+                    ax.scatter(x=line95_dict.values(),y=line95_dict.keys(),color=STAT_COLOR,marker='>',edgecolors=get_darker_color(STAT_COLOR,30),s=MEAN_POINT_SIZE)
+            elif orient == 'v':
+                ax.scatter(y=mean_dict.values(),x=mean_dict.keys(),color=STAT_COLOR,marker='x',s=MEAN_POINT_SIZE)
+                if confidence_lines in [True,'true','True']:  
+                    #MARKER = '_'
+                    ax.scatter(y=line05_dict.values(),x=line05_dict.keys(),color=STAT_COLOR,marker='v',edgecolors=get_darker_color(STAT_COLOR,30),s=MEAN_POINT_SIZE)
+                    ax.scatter(y=line95_dict.values(),x=line95_dict.keys(),color=STAT_COLOR,marker='^',edgecolors=get_darker_color(STAT_COLOR,30),s=MEAN_POINT_SIZE)
 
     #set_axis_style(ax,y,by)
 
@@ -860,6 +947,8 @@ def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_me
                 ax=ax
                     )           
     
+    ax.legend()
+
     if overall_mean in [True,'true','True']:
         set_overall_mean(ax=ax,df=df,y=y,std_lines=std_lines)
 
@@ -868,6 +957,9 @@ def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_me
     
     if category_mean in [True,'true','True'] and overall_mean in [True,'true','True']:
         set_mean_distances(ax=ax,df=df,y=y,by=by,orient=orient)    
+
+    if confidence_lines in [True,'true','True']:
+        set_confidence_lines(ax=ax,df=df,y=y,by=by,confidence_lines=confidence_lines)      
 def set_dist_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient='v',category_stats=True,overall_stats=True): #################### need fix #################
     def set_axis_style(ax,y:str,x:str,stat=stat):
         ax.set_xlabel(x, fontsize=13, fontfamily=CONFIG['Chart']['font'], color=CONFIG['Chart']['font_color'])
@@ -1028,41 +1120,168 @@ def set_pie_plot(ax,df:pd.DataFrame,y:str=None,stat:str=['percent','count']):
         wedgeprops={"linewidth": 1, "edgecolor": CONFIG['Chart']['frame_color']}, 
         frame=False
         )
+def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None,max_x_labels:int=None):
+    def set_axis_style(ax,y:str,x:str):
+        ax.set_xlabel(x, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+        ax.set_ylabel(y, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
+        ax.tick_params(axis='x',labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        ax.tick_params(axis='y', labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    LINE_WIDTH = 1
+    X_LABELS = max_x_labels
+
+    if by in ['None','none',None]:
+        ax.plot(
+            df[x],df[y],
+            color=color if color not in [None,'none','None'] else CONFIG['Chart']['data_colors'][0],
+            linewidth=LINE_WIDTH, label=f"{y}"
+        )
+    else:
+        for i,cat in enumerate(df[by].unique()):
+            COLOR_INDEX = i % len(CONFIG['Chart']['data_colors'])
+            data = df.loc[df[by]==cat,[y,x,by]]
+            ax.plot(
+                data[x],data[y],
+                color=color if color not in [None,'none','None'] else CONFIG['Chart']['data_colors'][COLOR_INDEX],
+                linewidth=LINE_WIDTH, label=f"{cat}"
+            )
+
+    if X_LABELS is not None:
+        xticks = np.linspace(0, len(df[x]) - 1, min(X_LABELS,len(df)-1), dtype=int)
+        try:
+            xticklabels = df[x].iloc[xticks] if pd.api.types.is_datetime64_any_dtype(df[x]) else df.loc[df.index[xticks],x]
+        except:
+            xticklabels = df.index[xticks]
+        ax.set_xticks(xticklabels)
+
+    ax.tick_params(axis='x', rotation=45)    
 
 # analysis 
-def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:float=0.8):
-    def set_log(df,y,x):
+def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:float=0.8,changepoint_prior_scale:float=0.05,seasonality_prior_scale:float=10.0,seasonality_mode:str='additive'):
+    def set_log(df,y,x,training_size=0.8):
+
+        try:
+            df_cv = cross_validation(
+            model,
+            initial=f'{int(training_size*len(df))} days',     # train size
+            period=f'{int((1-training_size)*0.5*len(df))} days',      # spacing between cutoffs
+            horizon=f'{int((1-training_size)*len(df))} days'      # forecast horizon
+            )
+            df_p = performance_metrics(df_cv)
+            m = df_p[['horizon', 'mae', 'rmse', 'mape']]
+            metric = {
+                'horizon':m['horizon'].mean(),
+                'mae':m['mae'].mean(),
+                'rmse':m['rmse'].mean(),
+                'mape':m['mape'].mean()
+                }
+        except:
+            metric = pd.DataFrame()
+
         return textwrap.dedent(f"""\
         Time Series Analysis:
         ---------------------
         df = '{DATA_TABLE["file_name"]}'
         y  = '{y}' 
         x  = '{x}' 
+
+        performance metrics:
+        {metric}
     """)
 
-    fig, axes = plt.subplots(4,1,figsize=(5,25), dpi=80,constrained_layout=True)
+    fig = plt.figure(figsize=(20,7), dpi=80)
+    gs = gridspec.GridSpec(6,2, width_ratios=[10,4])
+    FORECAST_COLOR = get_darker_color(CONFIG['Chart']['data_colors'][0],20)
+
     table = pd.DataFrame()
+    log = set_log(df=df, y=y, x=x)
 
-    x = df.index if x in [None,'none','None','index'] else x
-
-    try:
-        log = set_log(df=df,y=y,x=x)
+    if x not in [None, 'none', 'None']:
         components = ['trend', 'weekly', 'yearly']
-        df[x] = pd.to_datetime(df[x]) if x not in [None,'none','None'] else df.index
-        data = df[[x,y]].rename(columns={x:'ds',y:'y'},inplace=False).copy()
+        df[x] = pd.to_datetime(df[x])
+        data = df[[x, y]].rename(columns={x: 'ds', y: 'y'}).copy()
         train = data.iloc[:int(len(data) * training_size)]
         test = data.iloc[int(len(data) * training_size):]
-        model = Prophet()
+        
+        model = Prophet(
+            changepoint_prior_scale=changepoint_prior_scale,     # trend flexibility
+            seasonality_prior_scale=seasonality_prior_scale,     # seasonality flexibility
+            yearly_seasonality=True,
+            weekly_seasonality=True,
+            seasonality_mode=seasonality_mode    # or 'multiplicative'
+            )
         model.fit(train)
-        future = model.make_future_dataframe(periods=len(test), freq='D')
+        future = model.make_future_dataframe(periods=len(test)*2, freq='D')  # extend the future dataframe
         forecast = model.predict(future)
+        df_plot = data.merge(forecast, on='ds', how='outer')
+        df_plot['day'] = df_plot['ds'].dt.day_name()
+        df_plot['month'] = df_plot['ds'].dt.month_name()
+        df_plot['residual'] = df_plot['y'] - df_plot['yhat']
+        df_plot['month_norm_value'] = df_plot['y'] - df_plot['trend']
+        df_plot['day_norm_value'] = df_plot['y'] - (df_plot['trend'] + df_plot['yearly'])
 
-        axes[0].plot(components['ds'], components['trend'], label='Trend')
-        axes[0].set_title('Trend')
-        axes[0].grid(True)
+        # evaluating performance
+        log = set_log(df,y,x,training_size=training_size)
 
-    except Exception as e:    
-        log = e
+        # Define axes
+        ax_main = fig.add_subplot(gs[0:4, 0])
+        ax_resid = fig.add_subplot(gs[4:6, 0],sharex=ax_main)
+        ax_trend = fig.add_subplot(gs[0:2, 1])
+        ax_yearly = fig.add_subplot(gs[2:4, 1])
+        ax_weekly = fig.add_subplot(gs[4:6, 1])
+
+        table = df_plot.tail(10) # monitor
+        set_line_plot(ax=ax_main, df=df_plot, y='yhat', x='ds', color=FORECAST_COLOR)
+        set_line_plot(ax=ax_main, df=df_plot, y='y', x='ds', color=CONFIG['Chart']['data_colors'][1])
+        ax_main.fill_between(df_plot['ds'], df_plot['yhat_lower'], df_plot['yhat_upper'], color=FORECAST_COLOR, alpha=0.2)
+        ax_main.set_ylabel("Forecast")
+        ax_main.spines['top'].set_visible(False)
+        ax_main.spines['right'].set_visible(False)
+
+        set_line_plot(ax=ax_resid, df=df_plot, y='residual', x='ds', color=CONFIG['Chart']['data_colors'][1])
+        ax_resid.set_ylabel("Residuals")
+        ax_resid.spines['top'].set_visible(False)
+        ax_resid.spines['right'].set_visible(False)
+
+        if 'trend' in df_plot.columns:
+            set_line_plot(ax=ax_trend, df=df_plot, y='trend', x='ds', color=FORECAST_COLOR)
+            ax_trend.fill_between(df_plot['ds'], df_plot['trend_lower'], df_plot['trend_upper'], color=FORECAST_COLOR, alpha=0.1)
+            ax_trend.set_ylabel("Trend")
+            ax_trend.set_xlabel(None)
+            ax_trend.spines['top'].set_visible(False)
+            ax_trend.spines['right'].set_visible(False)
+
+        if 'yearly' in df_plot.columns:
+            month_order = ['January', 'February', 'March', 'April', 'May', 'June','July', 'August', 'September', 'October', 'November', 'December']
+            df_plot['month'] = pd.Categorical(df_plot['month'], categories=month_order, ordered=True)
+            df_plot = df_plot.sort_values('month')
+            df_unique_months = df_plot[['month', 'yearly']].drop_duplicates(subset='month')
+            sns.lineplot(ax=ax_yearly, data=df_unique_months, x='month', y='yearly', color=FORECAST_COLOR, marker='o')
+            #sns.scatterplot(ax=ax_yearly, data=df_plot, x='month', y='month_norm_value', color=FORECAST_COLOR, alpha=0.3, s=10)
+            ax_yearly.set_ylabel("Yearly")
+            ax_yearly.set_xlabel(None)
+            ax_yearly.spines['top'].set_visible(False)
+            ax_yearly.spines['right'].set_visible(False)
+
+        if 'weekly' in df_plot.columns:
+            day_order = ['Sunday','Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            df_plot['day'] = pd.Categorical(df_plot['day'], categories=day_order, ordered=True)
+            df_plot = df_plot.sort_values('day')
+            df_unique_days = df_plot[['day', 'weekly']].drop_duplicates(subset='day')
+            #set_line_plot(ax=ax_weekly, df=df_unique_days, y='weekly', x='day', color=FORECAST_COLOR,max_x_labels=len(day_order))
+            sns.lineplot(ax=ax_weekly, data=df_unique_days, x='day', y='weekly', color=FORECAST_COLOR, marker='o')
+            #set_strip_plot(ax=ax_weekly, df=df_plot, y='day_norm_value', by='day', orient='v', color=FORECAST_COLOR, opacity=0.3)
+            #set_box_plot(ax=ax_weekly, df=df_plot, y='yhat', by='day', orient='v', overall_mean=False, category_mean=True, std_lines=False, confidence_lines=False)
+            ax_weekly.set_ylabel("Weekly")
+            ax_weekly.set_xlabel(None)
+            ax_weekly.spines['top'].set_visible(False)
+            ax_weekly.spines['right'].set_visible(False)
+            
+
+        plt.tight_layout()    
+    
 
     return {
         'output':{'log':log,'plot':fig,'table':table},
@@ -1080,13 +1299,28 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
             },
             'x':{
                 'type':'category',
-                'options':['index'] + [f"'{item}'" for item in df.select_dtypes(include=['datetime', 'datetimetz']).columns.tolist()],
+                'options':[f"'{item}'" for item in df.select_dtypes(include=['datetime', 'datetimetz']).columns.tolist() + df.select_dtypes(include='object').columns.tolist()],
                 'default':'index'
             },
             'training_size':{
                 'type':'float',
                 'options':[0.9,0.8,0.7,0.6,0.5],
                 'default':0.8
+            },
+            'changepoint_prior_scale':{
+                'type':'float',
+                'options':[0.01,0.05,0.1,0.2],
+                'default':0.05
+            },
+            'seasonality_prior_scale':{
+                'type':'float',
+                'options':[1.0,0.5,10.0],
+                'default':10.0
+            },
+            'seasonality_mode':{
+                'type':'category',
+                'options':["'additive'","'multiplicative'"],
+                'default':"'additive'"
             }
         }
     }
@@ -1316,7 +1550,7 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
             f_stat, p_val = None,None    
 
         anova_decision = None if y in ['None','none',None] or by in ['None','none',None] else 'Significant' if p_val < 0.05 else 'Not significant'    
-        decision_text = None if anova_decision == None else f"{by} effect on {y} is {anova_decision}"
+        decision_text = None if anova_decision == None else f"{by} Variance is {anova_decision}"
 
         return textwrap.dedent(f"""\
         Analysis of Variance:
@@ -1329,9 +1563,9 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         F-Statistic = {f_stat:.4f}
         P-Value = {p_val:.4f}
 
-        +--------------------------------------------------------+
+        +------------------------------------------+
         |Decision: {decision_text}|
-        +--------------------------------------------------------+
+        +------------------------------------------+
         """)
     def get_stats(data:pd.Series):
         return {
@@ -1387,12 +1621,14 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
 
     TTEST_ALPHA = 0.05
     OPACITY = 0.4
+    LEGEND_SIZE = 120
+
     try:
         log = set_log(df,y,by,contamination)
     except:
         log = 'No data to analyze'    
-    HEIGHT = 1 if by in [None,'none','None'] else len(df[by].unique())
-    fig, ax = plt.subplots(figsize=(5,HEIGHT),dpi=80)
+    HEIGHT = LEGEND_SIZE + 1 if by in [None,'none','None'] else len(df[by].unique())
+    fig, ax = plt.subplots(figsize=(LEGEND_SIZE + 5,HEIGHT),dpi=80)
     set_axis_style(ax=ax,y=y,x=by,orient='h')
     
     if y in [None,'none','None']:
@@ -1417,11 +1653,11 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
             )
         
         if by in [None,'none','None']:
-            set_box_plot(ax=ax,df=inliers,y=y,by=by,orient='h',overall_mean=True,category_mean=False,std_lines=True)
+            set_box_plot(ax=ax,df=inliers,y=y,by=by,orient='h',overall_mean=True,category_mean=False,confidence_lines=True)
             set_strip_plot(ax=ax,df=inliers,y=y,by=by,orient='h',opacity=OPACITY)
             set_strip_plot(ax=ax,df=outliers,y=y,by=by,orient='h',color='red',opacity=OPACITY)
         else:    
-            set_box_plot(ax=ax,df=inliers,y=y,by=by,orient='h',overall_mean=True,category_mean=True,std_lines=True)
+            set_box_plot(ax=ax,df=inliers,y=y,by=by,orient='h',overall_mean=True,category_mean=True,confidence_lines=True)
 
             _, all_cat_inliers, _ = set_data(df=df,y=y,by=by,contamination=contamination)
             set_strip_plot(ax=ax,df=all_cat_inliers,y=y,by=by,orient='h',opacity=OPACITY)
@@ -1443,7 +1679,13 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
                     'decision':"Significant" if p_val < TTEST_ALPHA else "Insignificant"
                 }
                 set_strip_plot(ax=ax,df=outliers,y=y,by=by,orient='h',color='red',opacity=OPACITY) 
-              
+
+    ax.legend(
+        bbox_to_anchor=(1.02, 1),  # x=1.02 (just outside right), y=1 (top)
+        loc='upper left',          # anchor the upper left of the legend to this point
+        borderaxespad=0
+        )
+    #fig.tight_layout()          
 
     return {
         'output':{'log':log,'plot':fig,'table':table},
