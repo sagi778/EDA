@@ -15,6 +15,9 @@ import traceback
 import statsmodels.api as sm
 import textwrap
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor  
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
@@ -22,6 +25,7 @@ from scipy import stats
 from scipy.stats import linregress,gaussian_kde,shapiro,ttest_ind
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import mean_squared_error
+from catboost import CatBoostClassifier, Pool
 from prophet import Prophet
 from prophet.diagnostics import cross_validation, performance_metrics
 
@@ -102,7 +106,8 @@ COMMANDS = load_json(f'{CURRENT_PATH}/commands.json')
 #print(CURRENT_PATH)
 
 # load data
-DATA_TABLE = {'path':CURRENT_PATH,
+DATA_TABLE = {'file_tree':None,
+              'path':CURRENT_PATH,
               'file_name':None,
               'df':None
              }
@@ -183,7 +188,7 @@ def get_preview(df:pd.DataFrame,rows:int=5,end:str='head',output_type:str='table
             }
         }
         }
-def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table'): 
+def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table',store=None): 
     data = {'column':[],'type':[],'dtype':[],'unique':[],'Non-Nulls':[],'Nulls':[],'Non-Nulls%':[],'Nulls%':[]}
     numeric_cols = df.select_dtypes(include=['number'])
     object_cols = df.select_dtypes(include=['object'])
@@ -203,6 +208,12 @@ def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table'):
         data = data[data.column==show].reset_index(drop=True)
 
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
+
+    if store not in [None,'none','None']:
+        file_tree = DATA_TABLE['file_tree']
+        df_name = store if store not in [None,'none','None'] else 'df_column_info'
+        file_tree.add_subfile(parent_file=DATA_TABLE['file_name'],df_name=df_name)
+
     return {
         'output':data,
         'output_type':output_type,
@@ -221,6 +232,11 @@ def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table'):
                 'type':'category',
                 'options':[f"'table'",f"'text'"],
                 'default':"'table'"
+            },
+            'store':{
+                'type':'text',
+                'options':['"df_columns_info"'],
+                'default':'"df_columns_info"'
             }
             }
         }      
@@ -1159,7 +1175,104 @@ def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str
     ax.tick_params(axis='x', rotation=45)    
 
 # analysis 
-def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:float=0.8,changepoint_prior_scale:float=0.05,seasonality_prior_scale:float=10.0,seasonality_mode:str='additive'):
+def get_feature_importance(df:pd.DataFrame,y:str=None,trees:int=100,exclude_outliers='False'):
+    def set_log(df,y,trees=100):
+
+        return textwrap.dedent(f"""\
+        Feature Importance Analysis:
+        ----------------------------
+        Prediction Type: {'Regression' if y in get_numeric_columns(df) else 'Classification'}
+        Model: {'Random Forest' if trees > 1 else 'Decision Tree'}
+        df = '{DATA_TABLE["file_name"]}'
+        y  = '{y}' 
+        trees = {trees}
+        Categorical features encoding: Categorical features are encoded as category mean value.
+        Noise Thershold: Synthetic random noise feature importance
+    """)
+    def set_model_type(df:pd.DataFrame,y:str=None,trees=trees):
+        if y in get_numeric_columns(df):
+            if trees > 1:
+                return RandomForestRegressor(n_estimators=trees, random_state=42) 
+            else: 
+                return DecisionTreeRegressor(random_state=42)
+        else:
+            if trees > 1:
+                return RandomForestClassifier(n_estimators=trees, random_state=42)
+            else:    
+                return DecisionTreeClassifier(random_state=42)
+
+    table = pd.DataFrame()
+    log = set_log(df=df, y=y,trees=trees)
+    fig, ax = plt.subplots(figsize=(4,int(len(df.columns)/3)), dpi=80)
+    data = df.copy()
+
+    if y not in [None, 'none', 'None']:
+
+        numeric_features = [col for col in ['noise_level'] + df.select_dtypes(include=['number']).columns.tolist() if col != y]
+        cat_features = [col for col in data.select_dtypes(exclude='number').columns.tolist() if col != y and data.shape[0] > len(data[col].unique())]
+        NOISE_CENTER = data[y].mean() if y in get_numeric_columns(df=data) else 0
+        data['noise_level'] = np.random.normal(loc=NOISE_CENTER, scale=1, size=len(data))
+        
+        # encoding categorical features
+        encoded_cols = []
+        if len(cat_features) > 0:
+            for column in cat_features:
+                if y in get_numeric_columns(df=data):
+                    means = data.groupby(column)[y].mean()
+                    data[f'{column}_target_mean'] = data[column].map(means)
+                    encoded_cols.append(f'{column}_target_mean')
+                else: 
+                    data[f'{column}_prob'] = df.groupby(column)[column].transform('count') / len(data)
+                    encoded_cols.append(f'{column}_prob') 
+
+        FEATURES = encoded_cols + numeric_features
+        X = data[FEATURES]
+        y_data = data[y] 
+        model = set_model_type(df=data, y=y, trees=trees)     
+        model.fit(X, y_data)
+        feature_importances = pd.DataFrame(model.feature_importances_, index=X.columns, columns=['importance']).sort_values('importance', ascending=False)
+        table = feature_importances.reset_index().rename(columns={'index': 'feature'})
+
+        # palette=sns.color_palette("Set2", n_colors=len(table))
+        sns.barplot(x='importance', y='feature', data=table, ax=ax, color=CONFIG['Chart']['data_colors'][0] , edgecolor=CONFIG['Chart']['frame_color'])
+        ax.set_title('Feature Importance')
+        ax.set_xlabel('Importance')
+        ax.set_ylabel('Feature')
+        ax.axvline(x=table.loc[table['feature']=='noise_level','importance'].values[0] , color='red', linestyle='--',linewidth=1, label='Noise Level')  # Add a vertical line at x=0.1
+
+        # Add value labels
+        for i, (value, feature) in enumerate(zip(table['importance'], table['feature'])):
+            TEXT_DISTANCE = (table['importance'].max() - table['importance'].min()) / 100
+            ax.text(value + TEXT_DISTANCE, i, f"{value:.3f}", va='center')
+
+    return {
+        'output':{'log':log,'plot':fig,'table':table},
+        'output_type':'analysis',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in df.columns.tolist()],
+                'default':None
+            },
+            'trees':{
+                'type':'integer',
+                'options':[1,20,100,200,500],
+                'default':100
+            },
+            'exclude_outliers':{
+                'type':'category',
+                'options':['"True"','"False"'],
+                'default':'"False"'
+            }
+        }
+    }    
+
+def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:float=0.8,yearly_seasonality=False,weekly_seasonality=False,changepoint_prior_scale:float=0.05,seasonality_prior_scale:float=10.0,seasonality_mode:str='additive'):
     def set_log(df,y,x,training_size=0.8):
 
         try:
@@ -1202,14 +1315,15 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
         components = ['trend', 'weekly', 'yearly']
         df[x] = pd.to_datetime(df[x])
         data = df[[x, y]].rename(columns={x: 'ds', y: 'y'}).copy()
+        training_size = training_size if training_size < 1 and training_size > 0 else 0.8
         train = data.iloc[:int(len(data) * training_size)]
         test = data.iloc[int(len(data) * training_size):]
         
         model = Prophet(
             changepoint_prior_scale=changepoint_prior_scale,     # trend flexibility
             seasonality_prior_scale=seasonality_prior_scale,     # seasonality flexibility
-            yearly_seasonality=True,
-            weekly_seasonality=True,
+            yearly_seasonality=bool(yearly_seasonality),
+            weekly_seasonality=bool(weekly_seasonality),
             seasonality_mode=seasonality_mode    # or 'multiplicative'
             )
         model.fit(train)
@@ -1279,7 +1393,6 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
             ax_weekly.spines['top'].set_visible(False)
             ax_weekly.spines['right'].set_visible(False)
             
-
         plt.tight_layout()    
     
 
@@ -1306,6 +1419,16 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
                 'type':'float',
                 'options':[0.9,0.8,0.7,0.6,0.5],
                 'default':0.8
+            },
+            'yearly_seasonality':{
+                'type':'category',
+                'options':["'False'","'True'"],
+                'default':"'False'"
+            },
+            'weekly_seasonality':{
+                'type':'category',
+                'options':["'False'","'True'"],
+                'default':"'False'"
             },
             'changepoint_prior_scale':{
                 'type':'float',
@@ -1713,7 +1836,7 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
             }
         }
     }
-def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0.03):
+def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0.03,decision_column='False'):
     def set_log(y,by,contamination):
         return textwrap.dedent(f'''\
                 Outliers Detection:
@@ -1775,7 +1898,7 @@ def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0
         ax[1].spines['left'].set_linewidth(1)
         ax[1].spines['bottom'].set_linewidth(1)
 
-    fig, ax = plt.subplots(2,1,figsize=(7,10),dpi=75,sharex='all')
+    fig, ax = plt.subplots(2,1,figsize=(3,5),dpi=75,sharex='all')
     log = set_log(y,by,contamination)
     set_axis_style(ax=ax,y=y,x=by)
 
@@ -1853,6 +1976,11 @@ def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0
                 'type':'float',
                 'options':[0.03,0.05,0.1],
                 'default':0.03
+            },
+            'decision_column':{
+                'type':'category',
+                'options':["'True'","'False'"],
+                'default':"'False'"
             }
         }
     }

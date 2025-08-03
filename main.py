@@ -12,18 +12,20 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget(self)
         self.layout = QHBoxLayout(self.central_widget)
 
-        self.file_explorer = FileExplorer()
+        self.file_tree = FileTree()
+        DATA_TABLE['file_tree'] = self.file_tree
+        self.file_explorer = FileExplorer(file_tree=self.file_tree)
         self.data_viewer = DataViewer()
+        
 
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self.file_explorer)
-        splitter.addWidget(self.data_viewer)
-        splitter.setSizes([600,1000])
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(self.file_explorer)
+        self.splitter.addWidget(self.file_tree)
+        self.splitter.addWidget(self.data_viewer)
 
-        splitter.addWidget(self.data_viewer)
-
-        self.layout.addWidget(splitter)
+        self.layout.addWidget(self.splitter)
         self.setCentralWidget(self.central_widget)
+        self.splitter.setSizes([350,250,1300])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
