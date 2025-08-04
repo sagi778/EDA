@@ -16,7 +16,7 @@ The **Story** tab is initially empty and serves as a place to save and organize 
 
 ## 🧭 Tabs Overview
 
-<img src="screenshots/tabs.png" width="800">
+<img src="screenshots/tabs.png">
 
 ---
 
@@ -31,49 +31,32 @@ The **Story** tab is initially empty and serves as a place to save and organize 
 
 ## 📂 Preview Tab
 
-Quickly explore your dataset using the following blocks:
-
-**Load and preview data**  
-<img src="screenshots/get_preview.png" width="800">
-
-**Load data from file**  
-<img src="screenshots/get_data.png" width="800">
-
-**View column metadata**  
-<img src="screenshots/get_columns_info.png" width="800">
-
-**Numeric summary statistics**  
-<img src="screenshots/get_numerics_desc.png" width="800">
-
-**Categorical summary statistics**  
-<img src="screenshots/get_categorical_desc.png" width="800">
+| Description                    | Example                                      |
+|-------------------------------|----------------------------------------------|
+| Load and preview data         | <img src="screenshots/get_preview.png" width="800"> |
+| Load data from file           | <img src="screenshots/get_data.png" width="800"> |
+| View column metadata          | <img src="screenshots/get_columns_info.png" width="800"> |
+| Numeric summary statistics    | <img src="screenshots/get_numerics_desc.png" width="800"> |
+| Categorical summary statistics| <img src="screenshots/get_categorical_desc.png" width="800"> |
 
 ---
 
 ## 🧠 SQL Tab
 
-Query data directly using SQL-style commands:
-
-**SQL Data Loader**  
-<img src="screenshots/get_data.png" width="800">
+| Description       | Example                                   |
+|-------------------|-------------------------------------------|
+| SQL Data Loader   | <img src="screenshots/get_data.png" width="800"> |
 
 ---
 
 ## 📊 Plots Tab
 
-Visualize your data with a variety of plots:
-
-**Box Plot**  
-<img src="screenshots/get_box_plot.png" width="800">
-
-**Distribution Plot**  
-<img src="screenshots/get_dist_plot.png" width="800">
-
-**Count Plot (single feature)**  
-<img src="screenshots/get_count_plot.png" width="800">
-
-**Count Plot (multiple features)**  
-<img src="screenshots/get_count_plot_2.png" width="800">
+| Plot Type                    | Example                                      |
+|-----------------------------|----------------------------------------------|
+| Box Plot                    | <img src="screenshots/get_box_plot.png" width="800"> |
+| Distribution Plot           | <img src="screenshots/get_dist_plot.png" width="800"> |
+| Count Plot (single feature) | <img src="screenshots/get_count_plot.png" width="800"> |
+| Count Plot (multi-feature)  | <img src="screenshots/get_count_plot_2.png" width="800"> |
 
 ---
 
