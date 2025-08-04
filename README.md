@@ -34,7 +34,6 @@ The **Story** tab is initially empty and serves as a place to save and organize 
 | Description                    | Example                                      |
 |-------------------------------|----------------------------------------------|
 | Load and preview data         | <img src="screenshots/get_preview.png" width="800"> |
-| Load data from file           | <img src="screenshots/get_data.png" width="800"> |
 | View column metadata          | <img src="screenshots/get_columns_info.png" width="800"> |
 | Numeric summary statistics    | <img src="screenshots/get_numerics_desc.png" width="800"> |
 | Categorical summary statistics| <img src="screenshots/get_categorical_desc.png" width="800"> |
