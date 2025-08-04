@@ -10,17 +10,13 @@ Exploring the data is conducted via CommandBlocks from the following Tabs:
 
   
 # Preview Tab blocks:
-![get_preview](screenshots/get_preview.png)
+![get_preview](screenshots/get_preview.png)  
+![get_data](screenshots/get_data.png)  
+![get_columns_info](screenshots/get_columns_info.png)  
+![get_numerics_desc](screenshots/get_numerics_desc.png)  
+![get_categorical_desc](screenshots/get_categorical_desc.png)  
 
-![get_data](screenshots/get_data.png)
-
-![get_columns_info](screenshots/get_columns_info.png)
-
-![get_numerics_desc](screenshots/get_numerics_desc.png)
-
-![get_categorical_desc](screenshots/get_categorical_desc.png)
-
-# Preview Tab blocks:
+# SQL Tab blocks:
 ![get_data](screenshots/get_data.png)  
 
 # Plots Tab blocks:
