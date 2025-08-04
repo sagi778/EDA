@@ -18,13 +18,20 @@ The **Story** tab is initially empty and serves as a place to save and organize 
 
 Quickly explore your dataset using the following blocks:
 
-| Description                    | Example                                      |
-|-------------------------------|----------------------------------------------|
-| Load and preview data         | ![get_preview](screenshots/get_preview.png)  |
-| Load data from file           | ![get_data](screenshots/get_data.png)        |
-| View column metadata          | ![get_columns_info](screenshots/get_columns_info.png) |
-| Numeric summary statistics    | ![get_numerics_desc](screenshots/get_numerics_desc.png) |
-| Categorical summary statistics| ![get_categorical_desc](screenshots/get_categorical_desc.png) |
+**Load and preview data**  
+<img src="screenshots/get_preview.png" width="600">
+
+**Load data from file**  
+<img src="screenshots/get_data.png" width="600">
+
+**View column metadata**  
+<img src="screenshots/get_columns_info.png" width="600">
+
+**Numeric summary statistics**  
+<img src="screenshots/get_numerics_desc.png" width="600">
+
+**Categorical summary statistics**  
+<img src="screenshots/get_categorical_desc.png" width="600">
 
 ---
 
@@ -32,9 +39,8 @@ Quickly explore your dataset using the following blocks:
 
 Query data directly using SQL-style commands:
 
-| Block           | Example                              |
-|-----------------|--------------------------------------|
-| SQL Data Loader | ![get_data](screenshots/get_data.png) |
+**SQL Data Loader**  
+<img src="screenshots/get_data.png" width="600">
 
 ---
 
@@ -42,12 +48,17 @@ Query data directly using SQL-style commands:
 
 Visualize your data with a variety of plots:
 
-| Plot Type                       | Example                                      |
-|--------------------------------|----------------------------------------------|
-| Box Plot                        | ![get_box_plot](screenshots/get_box_plot.png) |
-| Distribution Plot              | ![get_dist_plot](screenshots/get_dist_plot.png) |
-| Count Plot (single feature)     | ![get_count_plot](screenshots/get_count_plot.png) |
-| Count Plot (multiple features)  | ![get_count_plot_2](screenshots/get_count_plot_2.png) |
+**Box Plot**  
+<img src="screenshots/get_box_plot.png" width="600">
+
+**Distribution Plot**  
+<img src="screenshots/get_dist_plot.png" width="600">
+
+**Count Plot (single feature)**  
+<img src="screenshots/get_count_plot.png" width="600">
+
+**Count Plot (multiple features)**  
+<img src="screenshots/get_count_plot_2.png" width="600">
 
 ---
 
@@ -57,39 +68,4 @@ This section will include advanced data analysis Command Blocks.
 *(Content coming soon)*
 
 ---
-
-# Data_Explorer App
-
-Simple & fast Data Exploration tool, it allows you to explore data along many files.  
-App is built on simple "Command blocks" - each block contain an analysis which is a piece in the puzzle.  
-
-Exploring the data is conducted via CommandBlocks from the following Tabs:  
-**"Preview"/"Plots"/"Analysis"**.  
-![Tabs](screenshots/tabs.png)  
-"Story" Tab is empty & will contain only saved CommandBlocks - it is used for presenting the final result.  
-
-  
-# Preview Tab blocks:
-![get_preview](screenshots/get_preview.png)  
-![get_data](screenshots/get_data.png)  
-![get_columns_info](screenshots/get_columns_info.png)  
-![get_numerics_desc](screenshots/get_numerics_desc.png)  
-![get_categorical_desc](screenshots/get_categorical_desc.png)  
-
-# SQL Tab blocks:
-![get_data](screenshots/get_data.png)  
-
-# Plots Tab blocks:
-![get_box_plot](screenshots/get_box_plot.png)  
-![get_dist_plot](screenshots/get_dist_plot.png)  
-![get_count_plot](screenshots/get_count_plot.png)  
-![get_count_plot_2](screenshots/get_count_plot_2.png)  
-
-
-# Analysis Tab blocks:
-
-
-
-
-
 
