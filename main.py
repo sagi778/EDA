@@ -17,7 +17,6 @@ class MainWindow(QMainWindow):
         self.file_explorer = FileExplorer(file_tree=self.file_tree)
         self.data_viewer = DataViewer()
         
-
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.addWidget(self.file_explorer)
         self.splitter.addWidget(self.file_tree)

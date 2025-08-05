@@ -451,11 +451,11 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
             return 3 
         
     MAX_CATEGORIES = 30
-    LEGEND_SIZE = 1
+    LEGEND_SIZE = 2
     NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else min(len(df[by].unique()),MAX_CATEGORIES)
     HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
 
-    fig, ax = plt.subplots(figsize=(HEIGHT,LEGEND_SIZE + WIDTH),dpi=80)
+    fig, ax = plt.subplots(figsize=(LEGEND_SIZE + WIDTH,HEIGHT),dpi=80)
     set_axis_style(ax=ax,y=y,x=by,orient=orient)
     
     try:
@@ -539,10 +539,11 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
     NUM_OF_CATEGORIES = get_num_of_categories(df,y,by)
     HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
 
-    fig, ax = plt.subplots(figsize=(HEIGHT,WIDTH),dpi=75)
+    fig, ax = plt.subplots(figsize=(WIDTH,HEIGHT),dpi=80)
       
     try:
         set_count_plot(ax=ax,df=df,y=y,by=by,orient=orient)
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
     except Exception as e:
         print(e) 
 
@@ -582,20 +583,22 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
+    WIDTH = 7 if df.shape[0] < 1000 else 10
+    HEIGHT = 6 
     POINT_SIZE = 5 if len(df) > 1000 else 8 if len(df) > 200 else 9
     ALPHA = 0.2 if len(df) > 1000 else 0.4 if len(df) > 200 else 0.6
     
-    fig, ax = plt.subplots(figsize=(5,POINT_SIZE),dpi=80)
+    fig, ax = plt.subplots(figsize=(WIDTH + 2,HEIGHT),dpi=80)
     set_axis_style(ax,y,x)
 
     try:
         set_scatter_plot(ax=ax,df=df,y=y,x=x,by=by)
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
     except Exception as e:
         print(e)    
     
     return {
         'output':fig,
-        'size':(300,700),
         'output_type':'plot',
         'args':{
             'df':{
@@ -624,12 +627,14 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
         ax.set_ylabel(y, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
-        ax.tick_params(axis='x',labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
-        ax.tick_params(axis='y', labelsize=7,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        #ax.tick_params(axis='x',labelsize=9,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        #ax.tick_params(axis='y', labelsize=9,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
     
-    fig, ax = plt.subplots(figsize=(5,10),dpi=80)
+    WIDTH = 7 if df.shape[0] < 1000 else 10
+    HEIGHT = 6 
+    fig, ax = plt.subplots(figsize=(WIDTH+2,HEIGHT),dpi=80)
     set_axis_style(ax,y,x)
 
     try:
@@ -640,7 +645,6 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
     
     return {
         'output':fig,
-        'size':(500,1150),
         'output_type':'plot',
         'args':{
             'df':{
@@ -720,16 +724,16 @@ def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient
     }
 def get_pie_plot(df:pd.DataFrame,y:str=None,stat:str='percent'):
     
-    fig, ax = plt.subplots(figsize=(5,5),dpi=75)
+    fig, ax = plt.subplots(figsize=(5,5),dpi=80)
 
     try:
         set_pie_plot(ax=ax,df=df,y=y,stat=stat)
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
     except Exception as e:
         print(e)    
     
     return {
         'output':fig,
-        'size':(300,700),
         'output_type':'plot',
         'args':{
             'df':{
@@ -1121,10 +1125,6 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:
         pass    
     set_axis_style(ax=ax,y=y,x=x)
 def set_pie_plot(ax,df:pd.DataFrame,y:str=None,stat:str=['percent','count']):
-    def count_autopct(pct):
-        total = sum(counts)
-        count = int(round(pct * total / 100.0))
-        return f'{count}'
 
     ax.pie(
         df[y].value_counts(),
@@ -1203,7 +1203,7 @@ def get_feature_importance(df:pd.DataFrame,y:str=None,trees:int=100,exclude_outl
 
     table = pd.DataFrame()
     log = set_log(df=df, y=y,trees=trees)
-    fig, ax = plt.subplots(figsize=(4,int(len(df.columns)/3)), dpi=80)
+    fig, ax = plt.subplots(figsize=(8,int(len(df.columns)/3)), dpi=80)
     data = df.copy()
 
     if y not in [None, 'none', 'None']:
@@ -1244,6 +1244,8 @@ def get_feature_importance(df:pd.DataFrame,y:str=None,trees:int=100,exclude_outl
         for i, (value, feature) in enumerate(zip(table['importance'], table['feature'])):
             TEXT_DISTANCE = (table['importance'].max() - table['importance'].min()) / 100
             ax.text(value + TEXT_DISTANCE, i, f"{value:.3f}", va='center')
+
+        fig.tight_layout()    
 
     return {
         'output':{'log':log,'plot':fig,'table':table},

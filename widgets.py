@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QStackedLayout,QVBoxLayout,QHBoxLayout,QFormLayout,Q
 from PyQt5.QtWidgets import QTreeView, QFileSystemModel,QFileIconProvider,QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit,QListWidget,QListWidgetItem,QAbstractItemView
 
 from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor,QIntValidator,QDoubleValidator,QStandardItemModel,QStandardItem
-from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize,QFileInfo,QPropertyAnimation,QObject,pyqtSignal,QThread, QEvent
+from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize,QFileInfo,QPropertyAnimation,QObject,pyqtSignal,QThread,QEvent
 import sys
 import traceback
 from func import *
@@ -157,6 +157,12 @@ class CodeControls(QWidget):
         self.down.clicked.connect(self.set_down)
         left_layout.addWidget(self.down)
 
+        self.pin = QPushButton('', self)
+        self.pin.setIcon(QIcon(f'{CURRENT_PATH}/icons/thumbtack.png'))
+        self.pin.setStyleSheet(BUTTON_STYLE)
+        self.pin.clicked.connect(self.set_pin)
+        left_layout.addWidget(self.pin)
+
         self.add = QPushButton('', self)
         self.add.setIcon(QIcon(f'{CURRENT_PATH}/icons/add.png'))
         self.add.setStyleSheet(BUTTON_STYLE)
@@ -164,17 +170,17 @@ class CodeControls(QWidget):
         left_layout.addWidget(self.add)
 
         # right side buttons
+        self.pic = QPushButton('', self)
+        self.pic.setIcon(QIcon(f'{CURRENT_PATH}/icons/pic.png'))
+        self.pic.setStyleSheet(BUTTON_STYLE)
+        self.pic.clicked.connect(self.set_picture)
+        right_layout.addWidget(self.pic)
+
         self.comment = QPushButton('', self)
         self.comment.setIcon(QIcon(f'{CURRENT_PATH}/icons/comment.png'))
         self.comment.setStyleSheet(BUTTON_STYLE)
         self.comment.clicked.connect(self.set_comment)
         right_layout.addWidget(self.comment)
-
-        self.pin = QPushButton('', self)
-        self.pin.setIcon(QIcon(f'{CURRENT_PATH}/icons/thumbtack.png'))
-        self.pin.setStyleSheet(BUTTON_STYLE)
-        self.pin.clicked.connect(self.set_pin)
-        right_layout.addWidget(self.pin)
 
         self.trash = QPushButton('', self)
         self.trash.setIcon(QIcon(f'{CURRENT_PATH}/icons/trash.png'))
@@ -256,6 +262,12 @@ class CodeControls(QWidget):
                 current_cmd_block._folded_items.append(current_cmd_block._output)
                 current_cmd_block.block.setFixedHeight(170)
                 #current_cmd_block.layout.addWidget(TextOutput(text='>>>'))                  
+    def set_picture(self):
+        output_item = self.parent().parent()._output 
+        pixmap = QPixmap(output_item.size())
+        output_item.render(pixmap)
+        QApplication.clipboard().setPixmap(pixmap)
+
 class ArgsMenu(QWidget):
     def __init__(self,args:dict,cmd_block=None):
         super().__init__()
@@ -611,7 +623,7 @@ class CommandBlock(QWidget):
             elif output_obj['output_type'] == 'table':
                 self._output = TableOutput(output_obj['output'])
             elif output_obj['output_type'] == 'plot':  
-                self._output = PlotOutput(fig=output_obj['output'],height=int(100*output_obj['output'].get_size_inches()[0]),width=int(100*output_obj['output'].get_size_inches()[0]))      
+                self._output = PlotOutput(fig=output_obj['output'])      
             elif output_obj['output_type'] == 'analysis':  
                 self._output = AnalysisOutput(
                     plot=output_obj['output']['plot'],
@@ -623,14 +635,8 @@ class CommandBlock(QWidget):
         except Exception:
             #pass # use for full exception in vscode
             error = traceback.format_exc()   
-            self._output = TextOutput(text=error) 
+            self._output = TextOutput(text=error)  
 
-        try: 
-            OUTPUT_HEIGHT=self._output.frameGeometry().height()
-        except: 
-            OUTPUT_HEIGHT=0    
-
-        self.block.setFixedHeight(min(max(OUTPUT_HEIGHT + 300,220),1500)) # 300 < dynamic height < 1500 
         self.layout.addWidget(self._output)
     def set_block_size(self,h:int=120,w:int=1200):
         self.block.setFixedWidth(w)  # fixed width
@@ -1154,6 +1160,33 @@ class PlotOutput(QWidget):
     def set_plot(self, fig):
         self.canvas.figure = fig
         self.canvas.draw()
+class PlotOutput(QWidget):
+    def __init__(self, fig=None, parent=None):
+        super().__init__(parent)
+
+        self.setStyleSheet("background-color: white; border: 2px solid #333;")
+
+        self.layout = QVBoxLayout(self)
+        self.setLayout(self.layout)
+
+        if not fig:
+            fig = plt.figure(figsize=(1,1))  # Explicit default size
+
+        self.canvas = FigureCanvas(fig)
+        self._apply_canvas_settings()
+        self.layout.addWidget(self.canvas)
+
+    def _apply_canvas_settings(self):
+        self.canvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        w, h = self.canvas.figure.get_size_inches() * self.canvas.figure.dpi
+        self.canvas.setMinimumSize(int(w), int(h))
+        self.canvas.figure.axes[0].set_title(f"figure size: (w={w},h={h})")
+
+    def set_plot(self, fig):
+        self.canvas.setParent(None)
+        self.canvas = FigureCanvas(fig)
+        self._apply_canvas_settings()
+        self.layout.addWidget(self.canvas)
 class TableOutput(QWidget):
     def __init__(self,df:pd.DataFrame=pd.DataFrame()):
         super().__init__()    
@@ -1185,6 +1218,7 @@ class TableOutput(QWidget):
 
         self._df = df
         self._html_df = set_style(df.to_string(index=True)) 
+        WIDTH_SCROLL_THRESHOLD,HEIGHT_SCROLL_THRESHOLD = 1000,20
         MIN_TABLE_HEIGHT,MAX_TABLE_HEIGHT = 200,1000       
 
         LABEL_STYLE = f"""
@@ -1208,56 +1242,60 @@ class TableOutput(QWidget):
         self.outbox.setWordWrap(False)
         self.outbox.setAlignment(Qt.AlignLeft)
         self.outbox.setStyleSheet(LABEL_STYLE) 
-        
-        scroll_area = QScrollArea(self)
-        #print(f'table height= {self.outbox.geometry().height()}')  # monitor
-        #scroll_area.setFixedHeight(min(20 + 18*(3 + len(df)),1000)) # need to fix
-        scroll_area.setWidget(self.outbox)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet(f"""
-            QScrollArea {{
-                color: {CONFIG['FileExplorer']['color']};
-                background-color: white;
-                border-radius: 1px;
-                border: 0px solid white;
-                width: 1500;
-                padding: 2px;
-            }}
-            /* Scrollbar Customization */
-            QScrollBar:vertical {{
-                border: none;
-                background: white; 
-                width: 10px; /* Scrollbar width */
-                margin: 0px;
-                border-radius: 0px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {CONFIG['Controls']['hover-color']}; 
-                min-height: 20px;
-                border-radius: 2px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                background: none; /* Hide arrows */
-            }}
 
-            /* Horizontal Scrollbar Customization */
-            QScrollBar:horizontal {{
-                border: none;
-                background: white;
-                height: 15px; /* Scrollbar height */
-                margin: 0px;
-                border-radius: 0px;
-            }}
-            QScrollBar::handle:horizontal {{
-                background: {CONFIG['Controls']['hover-color']};
-                min-width: 10px;
-                border-radius: 2px;
-            }}
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-                background: none; /* Hide arrows */
-            }}
-        """)
-        self.layout.addWidget(scroll_area)
+        if len(df) > HEIGHT_SCROLL_THRESHOLD or len(self._html_df.split('\n')[0]) > WIDTH_SCROLL_THRESHOLD:
+            scroll_area = QScrollArea(self)
+            #print(f'table height= {self.outbox.geometry().height()}')  # monitor
+            scroll_area.setFixedHeight(min(20 + 18*(3 + len(df)),1000)) # need to fix
+            scroll_area.setWidget(self.outbox)
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setStyleSheet(f"""
+                QScrollArea {{
+                    color: {CONFIG['FileExplorer']['color']};
+                    background-color: white;
+                    border-radius: 1px;
+                    border: 0px solid white;
+                    width: 1500;
+                    padding: 2px;
+                }}
+                /* Scrollbar Customization */
+                QScrollBar:vertical {{
+                    border: none;
+                    background: white; 
+                    width: 10px; /* Scrollbar width */
+                    margin: 0px;
+                    border-radius: 0px;
+                }}
+                QScrollBar::handle:vertical {{
+                    background: {CONFIG['Controls']['hover-color']}; 
+                    min-height: 20px;
+                    border-radius: 2px;
+                }}
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                    background: none; /* Hide arrows */
+                }}
+
+                /* Horizontal Scrollbar Customization */
+                QScrollBar:horizontal {{
+                    border: none;
+                    background: white;
+                    height: 15px; /* Scrollbar height */
+                    margin: 0px;
+                    border-radius: 0px;
+                }}
+                QScrollBar::handle:horizontal {{
+                    background: {CONFIG['Controls']['hover-color']};
+                    min-width: 10px;
+                    border-radius: 2px;
+                }}
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                    background: none; /* Hide arrows */
+                }}
+            """)
+            self.layout.addWidget(scroll_area)
+        else:
+            self.layout.addWidget(self.outbox)
+
         self.setLayout(self.layout)
 class TextOutput(QWidget):
     def __init__(self,text:str='output text'):
@@ -1265,8 +1303,8 @@ class TextOutput(QWidget):
 
         self._text = text
         MAX_TEXT_HEIGHT = 600
+        HEIGHT_SCROLL_THRESHOLD,WIDTH_SCROLL_THRESHOLD = 20,200
         
-        #print(f"height = {self._rows}") # monitor
         LABEL_STYLE = f"""
             QLabel {{
                 font: {CONFIG['Output']['font']};
@@ -1287,53 +1325,57 @@ class TextOutput(QWidget):
         self.outbox.setAlignment(Qt.AlignLeft)
         self.outbox.setStyleSheet(LABEL_STYLE) 
         
-        scroll_area = QScrollArea(self)
-        scroll_area.setWidget(self.outbox)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFixedHeight(min(20*(1 + self._text.count('\n')),MAX_TEXT_HEIGHT))
-        scroll_area.setStyleSheet(f"""
-            QScrollArea {{
-                color: {CONFIG['FileExplorer']['color']};
-                background-color: white;
-                border-radius: 1px;
-                border: 0px solid white;
-                padding: 2px;
-            }}
-            /* Scrollbar Customization */
-            QScrollBar:vertical {{
-                border: none;
-                background: white; 
-                width: 10px; /* Scrollbar width */
-                margin: 0px;
-                border-radius: 0px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {CONFIG['Controls']['hover-color']}; 
-                min-height: 20px;
-                border-radius: 2px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                background: none; /* Hide arrows */
-            }}
+        if self._text.count('\n') > HEIGHT_SCROLL_THRESHOLD or len(self._text.split('\n')[0]) > WIDTH_SCROLL_THRESHOLD:
+            scroll_area = QScrollArea(self)
+            scroll_area.setWidget(self.outbox)
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setFixedHeight(min(20*(1 + self._text.count('\n')),MAX_TEXT_HEIGHT))
+            scroll_area.setStyleSheet(f"""
+                QScrollArea {{
+                    color: {CONFIG['FileExplorer']['color']};
+                    background-color: white;
+                    border-radius: 1px;
+                    border: 0px solid white;
+                    width: 1500;
+                    padding: 2px;
+                }}
+                /* Scrollbar Customization */
+                QScrollBar:vertical {{
+                    border: none;
+                    background: white; 
+                    width: 10px; /* Scrollbar width */
+                    margin: 0px;
+                    border-radius: 0px;
+                }}
+                QScrollBar::handle:vertical {{
+                    background: {CONFIG['Controls']['hover-color']}; 
+                    min-height: 20px;
+                    border-radius: 2px;
+                }}
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                    background: none; /* Hide arrows */
+                }}
 
-            /* Horizontal Scrollbar Customization */
-            QScrollBar:horizontal {{
-                border: none;
-                background: white;
-                height: 15px; /* Scrollbar height */
-                margin: 0px;
-                border-radius: 0px;
-            }}
-            QScrollBar::handle:horizontal {{
-                background: {CONFIG['Controls']['hover-color']};
-                min-width: 10px;
-                border-radius: 2px;
-            }}
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-                background: none; /* Hide arrows */
-            }}
-        """)
-        self.layout.addWidget(scroll_area)
+                /* Horizontal Scrollbar Customization */
+                QScrollBar:horizontal {{
+                    border: none;
+                    background: white;
+                    height: 15px; /* Scrollbar height */
+                    margin: 0px;
+                    border-radius: 0px;
+                }}
+                QScrollBar::handle:horizontal {{
+                    background: {CONFIG['Controls']['hover-color']};
+                    min-width: 10px;
+                    border-radius: 2px;
+                }}
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                    background: none; /* Hide arrows */
+                }}
+            """)
+            self.layout.addWidget(scroll_area)
+        else:
+            self.layout.addWidget(self.outbox)
 
         self.setLayout(self.layout)
 class AnalysisOutput(QWidget):
@@ -1349,5 +1391,5 @@ class AnalysisOutput(QWidget):
         self.layout.addWidget(TableOutput(df=table))
         self.layout.addWidget(PlotOutput(fig=plot))
         self.setLayout(self.layout)
-        self.setFixedHeight(self.layout.sizeHint().height())
+        #self.setFixedHeight(self.layout.sizeHint().height())
      
