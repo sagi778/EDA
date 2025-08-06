@@ -470,6 +470,7 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
     except Exception as e:
         print(e)    
     
+    fig.tight_layout()   
     return {
         'output':fig,
         'size':(HEIGHT,LEGEND_SIZE + WIDTH),
@@ -520,19 +521,19 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
     def set_height(df=df,by=by,orient=orient,num_of_categories:int=5):
             try:
                 if orient == 'v':
-                    max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
-                    return min(max(5,2*max_data_to_category),10)
+                    return 5
                 elif orient == 'h':
-                    return min(max(5,num_of_categories*2),15)
+                    max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
+                    return min(max(5,max_data_to_category),10)
             except:    
                 return 5        
     def set_width(df=df,by=by,orient=orient,num_of_categories:int=5):
             try:
                 if orient == 'h':
-                    max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
-                    return min(max(5,2*max_data_to_category),10)
+                    return 5
                 elif orient == 'v':
-                    return min(max(5,num_of_categories*2),15)
+                    max_data_to_category = max([ len(df[df[by]==cat]) for cat in df[by].unique() ])
+                    return min(max(5,max_data_to_category),10)
             except:        
                 return 5 
         
@@ -547,6 +548,7 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
     except Exception as e:
         print(e) 
 
+    fig.tight_layout()   
     return {
         'output':fig,
         'size':(HEIGHT,WIDTH),
@@ -597,6 +599,7 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
     except Exception as e:
         print(e)    
     
+    fig.tight_layout()   
     return {
         'output':fig,
         'output_type':'plot',
@@ -642,7 +645,8 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
         ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
     except Exception as e:
         print(e)    
-    
+
+    fig.tight_layout()   
     return {
         'output':fig,
         'output_type':'plot',
@@ -670,19 +674,20 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
         }
     }
 def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient='h',category_stats=True,overall_stats=False):
-    def get_num_of_categories(df:pd.DataFrame=df,y:str=y,by:str=by):
-        y_amount = 1 if y in [None,'none','None'] else len(df[y].unique())
-        by_amount = 1 if by in [None,'none','None'] else len(df[by].unique())
-        return y_amount*by_amount
+    def get_num_of_categories(df:pd.DataFrame=df,by:str=by):
+        categories = 1 if by in [None,'none','None'] else len(df[by].unique())
+        return min(categories,10)
 
-    NUM_OF_CATEGORIES = get_num_of_categories(df,y,by)
-    fig, ax = plt.subplots(figsize=(5,5*NUM_OF_CATEGORIES),dpi=80)
+    NUM_OF_CATEGORIES = get_num_of_categories(df,by)
+    WIDTH = min(2*NUM_OF_CATEGORIES,10) if orient == 'h' else 5
+    HEIGHT = 5 if orient == 'h' else min(2*NUM_OF_CATEGORIES,10)
+    
+    fig, ax = plt.subplots(figsize=(WIDTH,HEIGHT),dpi=80)
     
     set_dist_plot(ax=ax,df=df,y=y,by=by,stat=stat,orient=orient,category_stats=category_stats,overall_stats=overall_stats)
-
+    fig.tight_layout()   
     return {
         'output':fig,
-        'size':(300,500) if orient == 'v' else (500,700),
         'output_type':'plot',
         'args':{
             'df':{
@@ -732,6 +737,7 @@ def get_pie_plot(df:pd.DataFrame,y:str=None,stat:str='percent'):
     except Exception as e:
         print(e)    
     
+    fig.tight_layout()   
     return {
         'output':fig,
         'output_type':'plot',

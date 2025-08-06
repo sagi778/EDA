@@ -1051,8 +1051,7 @@ class FileTree(QWidget):
                 padding: 2px;
             }}
             QTreeView {{
-                border: {CONFIG['CodeLine']['border']};
-                background-color: {CONFIG['FileExplorer']['background-color']};
+                background-color: #f0f0f0;
                 font: {CONFIG['FileExplorer']['font']};
             }}
             QTreeView::item {{
