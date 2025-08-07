@@ -61,7 +61,7 @@ The **Story** tab is initially empty and serves as a place to save and organize 
 
 ## 📈 Analysis Tab
 
-This section will include advanced data analysis Command Blocks.  
+Analysis blocks contains: Explanation Text, Summary Table & Plot 
 *(Content coming soon)*
 
 ---
