@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QStackedLayout,QVBoxLayout,QHBoxLayout,QFormLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame,QSizePolicy
 from PyQt5.QtWidgets import QTreeView, QFileSystemModel,QFileIconProvider,QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit,QListWidget,QListWidgetItem,QAbstractItemView
 
-from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor,QIntValidator,QDoubleValidator,QStandardItemModel,QStandardItem
+from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor,QIntValidator,QDoubleValidator,QStandardItemModel,QStandardItem,QPainter
 from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize,QFileInfo,QPropertyAnimation,QObject,pyqtSignal,QThread,QEvent
 import sys
 import traceback
@@ -276,22 +276,29 @@ class ArgsMenu(QWidget):
         self._args = {}
         self._cmd_block = cmd_block
         MAX_ARG_WIDTH = 220
+        LABEL_STYLE = f"""
+                            QLabel {{
+                                font: {CONFIG['CodeLine']['font']};
+                                color: {CONFIG['CodeLine']['color']};
+                                padding: 0px 0px;
+                                border: none;
+                            }}
+                            """
 
         self.form_layout = QFormLayout()
         self.form_layout.setLabelAlignment(Qt.AlignRight)     # Align labels
         self.form_layout.setFormAlignment(Qt.AlignTop)  
         self.form_layout.setContentsMargins(40,0,40,0)
 
+        dt_label = QLabel('data table = ')
+        dt_label.setStyleSheet(LABEL_STYLE)
+        dt_arg_label = QLabel(f'{DATA_TABLE["table"]._file_name}')
+        dt_arg_label.setStyleSheet(LABEL_STYLE)
+        self.form_layout.addRow(dt_label, dt_arg_label)
+
         for arg_name,arg in args.items():
             arg_label = QLabel(arg_name + ' =')
-            arg_label.setStyleSheet(
-                                        "QLabel {"
-                                        f"font: {CONFIG['CodeLine']['font']};"
-                                        f"color: {CONFIG['CodeLine']['color']};"
-                                        "padding: 0px 0px;"
-                                        "border: none;"
-                                        "}"
-                                    )
+            arg_label.setStyleSheet(LABEL_STYLE)
 
             if arg['type'] == 'category':
                 combo = QComboBox()
@@ -547,11 +554,11 @@ class Comment(QWidget):
 
 # advanced widgets
 class CommandBlock(QWidget):
-    def __init__(self,data:pd.DataFrame=DATA_TABLE,cmd:str=''):
+    def __init__(self,dt:DataTable=DATA_TABLE['table'],cmd:str=''):
         super().__init__()
         self.setObjectName("CommandBlock")
         
-        self._df = data['df']
+        self._dt = dt
         self._cmd = cmd
         self._args = None
         self._output = None
@@ -611,7 +618,7 @@ class CommandBlock(QWidget):
 
         try:
             # no threads run
-            local_vars = {'df': self._df}
+            local_vars = {'df': self._dt._df, 'dt':self._dt}
             local_vars.update({k: getattr(func, k) for k in dir(func) if not k.startswith("_")})
             output_obj = eval(self._cmd, {}, local_vars) 
 
@@ -819,7 +826,7 @@ class DataViewer(QWidget):
         self.analysis_stack_layout.setCurrentIndex(index)       
     def set_preview(self):
         #print('[>] Setting up preview commands')
-        self.preview_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+        self.preview_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
 
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
@@ -827,7 +834,7 @@ class DataViewer(QWidget):
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['Preview']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string, data=DATA_TABLE))
+            content_layout.addWidget(CommandBlock(cmd=cmd_string, dt=DATA_TABLE['table']))
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -835,14 +842,14 @@ class DataViewer(QWidget):
         self.preview_stack_layout.addWidget(scroll_area)
     def set_sql(self):
         #print('[>] Setting up SQL commands')
-        self.sql_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+        self.sql_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setAlignment(Qt.AlignTop)
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['SQL']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))     
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['table']))     
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -850,14 +857,14 @@ class DataViewer(QWidget):
         self.sql_stack_layout.addWidget(scroll_area)       
     def set_plots(self):
         #print('[>] Setting up plots commands')
-        self.plots_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+        self.plots_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setAlignment(Qt.AlignTop)
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['Plots']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))     
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['table']))     
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -865,14 +872,14 @@ class DataViewer(QWidget):
         self.plots_stack_layout.addWidget(scroll_area)           
     def set_analysis(self):
         #print('[>] Setting up analysis commands')
-        self.analysis_comb.addItem(f"df = {DATA_TABLE['file_name']}")
+        self.analysis_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setAlignment(Qt.AlignTop)
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['Analysis']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string,data=DATA_TABLE))   
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['table']))   
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -1022,11 +1029,10 @@ class FileExplorer(QWidget):
 
         file_type = self._selected_file.split('.')[-1] 
         if file_type in ['csv','xlsx']:
-            DATA_TABLE['path'] = self._selected_file
-            DATA_TABLE['file_name'] = self._selected_file.split('/')[-1]
-            DATA_TABLE['df'] = read_data_file(DATA_TABLE['path'])
-            self.filename.setText(f"df = {DATA_TABLE['file_name']}")
-            self._file_tree.add_file(file_name=DATA_TABLE['file_name'], file_path=DATA_TABLE['path']) # test
+            DATA_TABLE['table'] = DataTable(file_tree=DATA_TABLE['file_tree'],path=self._selected_file)
+            #print(f"new table created: {DATA_TABLE['table'].get_status()}") # monitor
+            self.filename.setText(f"df = {DATA_TABLE['table']._file_name}")
+            self._file_tree.add_subfile(parent_file=DATA_TABLE['table']._file_name,df_name='df')
             load_file_to_data_viewer(self)
 class FileTree(QWidget):
     def __init__(self):
@@ -1119,7 +1125,6 @@ class FileTree(QWidget):
         new_item = QStandardItem(df_name)
         new_item.setIcon(parent_item.icon())
         parent_item.appendRow(new_item)
-
 
 # output widgets
 class PlotOutput(QWidget):

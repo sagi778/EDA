@@ -27,6 +27,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.metrics import mean_squared_error
 from catboost import CatBoostClassifier, Pool
 from prophet import Prophet
+from scipy.interpolate import griddata
 from prophet.diagnostics import cross_validation, performance_metrics
 
 # basic func
@@ -59,15 +60,6 @@ def load_json(file_path):
     except json.JSONDecodeError:
         print("Error parsing configuration file.")
         return {}  
-def read_data_file(file_full_path:str):
-    file_type = file_full_path.split('.')[-1] 
-    if file_type == 'csv':
-        return pd.read_csv(file_full_path)
-    elif file_type == 'xlsx':
-        return pd.read_excel(file_full_path)    
-    else:
-        print('Unsupported file type.')
-        return pd.DataFrame() 
 def get_darker_color(hex_color, percentage=10):
     """
     Darkens the given hex color by the specified percentage.
@@ -103,13 +95,52 @@ def get_darker_color(hex_color, percentage=10):
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 CONFIG = load_json(f'{CURRENT_PATH}/config.json')  
 COMMANDS = load_json(f'{CURRENT_PATH}/commands.json')    
-#print(CURRENT_PATH)
+
+# data frame class
+class DataTable():
+    def __init__(self, file_tree, path:str=None):
+        super().__init__()
+
+        self._file_tree = file_tree
+        self._path = path
+        self._file_name = self._path.split('/')[-1]
+        self._file_type = self._file_name.split('.')[-1]
+        self._df = self.read_data_file(self._path)
+        self._sub_frames = ['df']
+
+        self.update_file_tree()
+
+    def update_file_tree(self):
+        self._file_tree.add_file(file_name=self._file_name, file_path=self._path)
+    def read_data_file(self,file_full_path:str):
+        file_type = self._path.split('.')[-1] 
+        if file_type == 'csv':
+            df = pd.read_csv(self._path)
+            return df
+        elif file_type == 'xlsx':
+            df = pd.read_excel(self._path)
+            return df 
+        else:
+            print('Unsupported file type.')
+            return pd.DataFrame() 
+    def get_status(self):
+        return {'file_name':self._file_name,'df.columns':self._df.columns,'sub_frames':self._sub_frames}
+    def add_sub_frame(self, sub_frame_name:str):
+        if sub_frame_name not in self._sub_frames:
+            new_frame = sub_frame_name
+        else:        
+            new_frame = f'{sub_frame_name}(1)'
+        self._sub_frames.append(new_frame)
+        self._file_tree.add_subfile(parent_file=self._file_name, df_name=new_frame)
+
 
 # load data
 DATA_TABLE = {'file_tree':None,
+              'table':None, ##
               'path':CURRENT_PATH,
-              'file_name':None,
-              'df':None
+              #'file_name':None,
+              #'df':None,
+              #'sub_frames':[]
              }
 
 # charts general parameters
@@ -168,7 +199,7 @@ def get_preview(df:pd.DataFrame,rows:int=5,end:str='head',output_type:str='table
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':DATA_TABLE['table']._sub_frames,
                 'default':f"'df'"
             },
             'rows':{
@@ -328,7 +359,7 @@ def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:
             }
         }
     }    
-def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=['mean'],sort:str='descending',output_type:str='table'):
+def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=['mean'],sort:str='descending',output_type:str='table',store=None):
     
     data = pd.DataFrame(data={'y':[f'error: y = {y}'],'by':[f'error: by = {by}'],sub_cat:[f'error: sub_cat = {sub_cat}']})  
 
@@ -336,6 +367,10 @@ def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=[
         group_columns = [by] if sub_cat in [None,'none','None'] else [by,sub_cat]
         statistics = {y:[stat for stat in stats]}
         data = df.groupby(by=group_columns).agg(statistics)
+
+        if store not in [None,'None','none']:
+            DATA_TABLE['table']._sub_frames.append(store)
+            DATA_TABLE['table'].add_sub_frame(sub_frame_name=store)
            
     except Exception as e: 
         print(e)   
@@ -378,6 +413,11 @@ def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=[
                 'type':'category',
                 'options':["'table'","'text'"],
                 'default':"'table'"
+            },
+            'store':{
+                'type':'text',
+                'options':[],
+                'default':"'None'"
             }
         }
     } 
@@ -447,7 +487,8 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
         ax.legend(
             bbox_to_anchor=(1.02, 1),  # x=1.02 (just outside right), y=1 (top)
             loc='upper left',          # anchor the upper left of the legend to this point
-            borderaxespad=0
+            borderaxespad=0,
+            frameon=False             # no frame around the legend
         )
     except Exception as e:
         print(e)    
@@ -526,7 +567,6 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
       
     try:
         set_count_plot(ax=ax,df=df,y=y,by=by,orient=orient)
-        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
     except Exception as e:
         print(e) 
 
@@ -577,7 +617,7 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
 
     try:
         set_scatter_plot(ax=ax,df=df,y=y,x=x,by=by)
-        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
     except Exception as e:
         print(e)    
     
@@ -624,7 +664,7 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
 
     try:
         set_line_plot(ax=ax,df=df,y=y,x=x,by=by)
-        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1))
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
     except Exception as e:
         print(e)    
 
@@ -813,6 +853,11 @@ def set_strip_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',color:st
                     edgecolor=get_darker_color(color,50) if color in [None,'none','None'] else get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],50),
                     jitter=0.35,zorder=0
                     )        
+    
+    try:
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+    except:
+        pass  
 
     #set_axis_style(ax,y,by)
 def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_mean=True,category_mean=True,std_lines:bool=True,confidence_lines:bool=False):
@@ -956,7 +1001,10 @@ def set_box_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient='v',overall_me
                 ax=ax
                     )           
     
-    ax.legend()
+    try:
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+    except:
+        pass  
 
     if overall_mean in [True,'true','True']:
         set_overall_mean(ax=ax,df=df,y=y,std_lines=std_lines)
@@ -1051,6 +1099,11 @@ def set_dist_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',ori
 
     if overall_stats in [True,'true','True']:
         set_stats(ax=ax,data=df[y],color='grey',style='--')
+
+    try:
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+    except:
+        pass      
 def set_count_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(ax.get_xlabel() , fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
@@ -1082,6 +1135,11 @@ def set_count_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
 
     set_axis_style(ax=ax,y=y,x=by)
     set_anotation(ax=ax,orient=orient)
+    
+    try:
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+    except:
+        pass     
 def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
@@ -1117,7 +1175,7 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:
             ) 
 
     try:
-        ax.legend()
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
     except:
         pass    
     set_axis_style(ax=ax,y=y,x=x)
@@ -1133,6 +1191,11 @@ def set_pie_plot(ax,df:pd.DataFrame,y:str=None,stat:str=['percent','count']):
         wedgeprops={"linewidth": 1, "edgecolor": CONFIG['Chart']['frame_color']}, 
         frame=False
         )
+
+    try:
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+    except:
+        pass      
 def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None,max_x_labels:int=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
@@ -1171,16 +1234,21 @@ def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str
 
     ax.tick_params(axis='x', rotation=45)    
 
+    try:
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+    except:
+        pass  
+
 # analysis 
-def get_feature_importance(df:pd.DataFrame,y:str=None,trees:int=100,exclude_outliers='False'):
-    def set_log(df,y,trees=100):
+def get_feature_importance(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None,y:str=None,trees:int=100,exclude_outliers='False'):
+    def set_log(dt,y,trees=100):
 
         return textwrap.dedent(f"""\
         Feature Importance Analysis:
         ----------------------------
-        Prediction Type: {'Regression' if y in get_numeric_columns(df) else 'Classification'}
+        Prediction Type: {'Regression' if y in get_numeric_columns(dt._df) else 'Classification'}
         Model: {'Random Forest' if trees > 1 else 'Decision Tree'}
-        df = '{DATA_TABLE["file_name"]}'
+        file = '{dt._file_name}'
         y  = '{y}' 
         trees = {trees}
         Categorical features encoding: Categorical features are encoded as category mean value.
@@ -1198,8 +1266,9 @@ def get_feature_importance(df:pd.DataFrame,y:str=None,trees:int=100,exclude_outl
             else:    
                 return DecisionTreeClassifier(random_state=42)
 
+    dt = DATA_TABLE['table']
     table = pd.DataFrame()
-    log = set_log(df=df, y=y,trees=trees)
+    log = set_log(dt=dt, y=y,trees=trees)
     fig, ax = plt.subplots(figsize=(8,int(len(df.columns)/3)), dpi=80)
     data = df.copy()
 
@@ -1250,8 +1319,8 @@ def get_feature_importance(df:pd.DataFrame,y:str=None,trees:int=100,exclude_outl
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
-                'default':f"'df'"
+                'options':dt._sub_frames,
+                'default':f"'dt'"
             },
             'y':{
                 'type':'category',
@@ -1448,7 +1517,89 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
     }
     
 
-    
+def get_anomaly_analysis(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None,x1:str=None,x2:str=None,by:str=None,contamination:float=0.03,n_neighbors:int=20):
+    def set_log(dt,x1,x2,by,contamination,n_neighbors):
+        return textwrap.dedent(f"""\
+                                Anomaly Analysis:
+                                -----------------
+                                data table = '{dt._file_name}'
+                                X1  = '{x1}'  
+                                X2  = '{x2}'  
+                                by = '{by}'
+                                Contamination = {contamination}  (= Ignored % of data points)
+                                Neighbors = {n_neighbors} (= Number of neighbors to use for LOF)
+
+                                Local Outlier Factor (LOF) is used to detect anomalies in the data.
+                                LOF is a density-based anomaly detection algorithm that identifies anomalies based on their local density compared to their neighbors.
+                                The contamination parameter specifies the proportion of data points that are expected to be outliers.
+                            """) 
+    def set_axis_style(ax,x1:str,x2:str):
+        for i in range(len(ax)):
+            ax[i].set_xlabel(x1, fontsize=12, fontfamily=CONFIG['Chart']['font'], color=CONFIG['Chart']['font_color'])
+            ax[i].set_ylabel(x2, fontsize=12, fontfamily=CONFIG['Chart']['font'], color=CONFIG['Chart']['font_color'])   
+            ax[i].tick_params(axis='x',labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+            ax[i].tick_params(axis='y', labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+            ax[i].spines['top'].set_visible(False)
+            ax[i].spines['right'].set_visible(False)
+
+    df = dt._df        
+    fig, ax = plt.subplots(2,1,figsize=(8,10),dpi=80,sharex=True,constrained_layout=True)
+    log = set_log(dt,x1,x2,by,contamination,n_neighbors)
+    set_axis_style(ax=ax,x1=x1,x2=x2)
+    table = pd.DataFrame()
+
+    if x1 in df.columns and x2 in df.columns:
+
+        data = df[[x1,x2]].copy()
+        lof = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination)
+        data['lof_label'] = lof.fit_predict(data[[x1,x2]])  # -1 = outlier, 1 = inlier
+        data['lof_score'] = -lof.negative_outlier_factor_       # higher = more outlier
+
+        set_scatter_plot(ax=ax[0], df=data[data.lof_label==-1], y=x2, x=x1, by=by,color='red')
+        set_scatter_plot(ax=ax[0], df=data[data.lof_label==1], y=x2, x=x1, by=by)
+        sc = ax[1].scatter(data[x1], data[x2], c=data['lof_score'], cmap='Reds',s=ax[0].collections[0].get_sizes()[0],edgecolors=get_darker_color(CONFIG['Chart']['data_colors'][0],30), alpha=0.6)
+        fig.colorbar(sc, ax=ax[1], label="LOF Score", orientation='vertical', pad=0.0,aspect=20,use_gridspec=True)
+        
+    fig.suptitle('Anomaly Detection using Local Outlier Factor (LOF)', fontsize=16, fontfamily=CONFIG['Chart']['font'], color=CONFIG['Chart']['font_color'])    
+
+    return {
+        'output':{'log':log,'plot':fig,'table':table},
+        'output_type':'analysis',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':['df'],
+                'default':f"'df'"
+            },
+            'x1':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=1)],
+                'default':None
+            },
+            'x2':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=1)],
+                'default':None
+            },
+            'by':{
+                'type':'category',
+                'options':['None']+[f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
+                'default':'None'
+            },
+            'contamination':{
+                'type':'float',
+                'options':[0.03,0.05,0.1],
+                'default':0.03
+            },
+            'n_neighbors':{
+                'type':'integer',
+                'options':[5,10,20,50],
+                'default':20
+            }
+        }
+    }
+
+
 def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
     def set_log(df,y,by,alpha):
         ct = pd.crosstab(df[by], df[y])
