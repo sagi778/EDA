@@ -106,7 +106,7 @@ class DataTable():
         self._file_name = self._path.split('/')[-1]
         self._file_type = self._file_name.split('.')[-1]
         self._df = self.read_data_file(self._path)
-        self._sub_frames = ['df']
+        self._sub_frames = {'df':self._df}
 
         self.update_file_tree()
 
@@ -125,12 +125,9 @@ class DataTable():
             return pd.DataFrame() 
     def get_status(self):
         return {'file_name':self._file_name,'df.columns':self._df.columns,'sub_frames':self._sub_frames}
-    def add_sub_frame(self, sub_frame_name:str):
-        if sub_frame_name not in self._sub_frames:
-            new_frame = sub_frame_name
-        else:        
-            new_frame = f'{sub_frame_name}(1)'
-        self._sub_frames.append(new_frame)
+    def add_sub_frame(self, sub_frame_name:str, df:pd.DataFrame=pd.DataFrame()):
+        new_frame = sub_frame_name
+        self._sub_frames.update({sub_frame_name:df}) 
         self._file_tree.add_subfile(parent_file=self._file_name, df_name=new_frame)
 
 
@@ -159,7 +156,9 @@ def get_numeric_columns(df:pd.DataFrame,min_uniques=10):
     return [col for col in df.columns if len(df[col].unique()) > min_uniques or col in df.select_dtypes(include=['number'])]    
 
 # preview
-def get_shape(df:pd.DataFrame,output_type:str='table'):
+def get_shape(dt:DataTable=None,df:str=None,output_type:str='table'):
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     data = pd.DataFrame(data=df.shape,columns=['#'],index=['rows','columns']).T
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql') # rounded_grid/psql
     return {
@@ -168,9 +167,9 @@ def get_shape(df:pd.DataFrame,output_type:str='table'):
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
-                },
+            },
             'output_type':{
                 'type':'category',
                 'options':[f"'table'",f"'text'"],
@@ -178,8 +177,9 @@ def get_shape(df:pd.DataFrame,output_type:str='table'):
                 }
                 }
         }  
-def get_preview(df:pd.DataFrame,rows:int=5,end:str='head',output_type:str='table'):
-    
+def get_preview(dt:DataTable=None,df:str=None,rows:int=5,end:str='head',output_type:str='table'):
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     if rows >= len(df):
         data = df 
     elif end == 'head':
@@ -199,7 +199,7 @@ def get_preview(df:pd.DataFrame,rows:int=5,end:str='head',output_type:str='table
         'args':{
             'df':{
                 'type':'category',
-                'options':DATA_TABLE['table']._sub_frames,
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'rows':{
@@ -219,7 +219,9 @@ def get_preview(df:pd.DataFrame,rows:int=5,end:str='head',output_type:str='table
             }
         }
         }
-def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table',store=None): 
+def get_columns_info(dt:DataTable=None,df:str=None,show='all',output_type:str='table',store=None): 
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     data = {'column':[],'type':[],'dtype':[],'unique':[],'Non-Nulls':[],'Nulls':[],'Non-Nulls%':[],'Nulls%':[]}
     numeric_cols = df.select_dtypes(include=['number'])
     object_cols = df.select_dtypes(include=['object'])
@@ -251,7 +253,7 @@ def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table',store=No
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'show':{
@@ -271,7 +273,9 @@ def get_columns_info(df:pd.DataFrame,show='all',output_type:str='table',store=No
             }
             }
         }      
-def get_numerics_desc(df:pd.DataFrame,show='all',output_type:str='table'):
+def get_numerics_desc(dt:DataTable=None,df:str=None,show='all',output_type:str='table'):
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     data = df.describe([.005,.25,.5,.75,.995]).T
     numeric_columns = list(data.index)
     data['count'] = data['count'].astype(int)
@@ -288,7 +292,7 @@ def get_numerics_desc(df:pd.DataFrame,show='all',output_type:str='table'):
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'show':{
@@ -303,7 +307,9 @@ def get_numerics_desc(df:pd.DataFrame,show='all',output_type:str='table'):
             }
         }
         }    
-def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:str='table'):
+def get_categorical_desc(dt:DataTable=None,df:str=None,show='all',outliers='None',output_type:str='table'):
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     categorical_columns = [col for col in df.columns if str(df[col].dtype) in ['object','category','bool']]
     df = df[categorical_columns].copy()
     data = {'column':[],'type':[],'unique':[],'mode':[],'mode_occurances':[],'mode%':[],'prob_outliers':[],'outlier_items':[],'outliers_occurance_probability':[]}
@@ -339,7 +345,7 @@ def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'show':{
@@ -359,8 +365,9 @@ def get_categorical_desc(df:pd.DataFrame,show='all',outliers='None',output_type:
             }
         }
     }    
-def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=['mean'],sort:str='descending',output_type:str='table',store=None):
-    
+def get_group_by(dt:DataTable=None,df:str=None,y:str=None,by:str=None,sub_cat:str=None,stats=['mean'],sort:str='descending',output_type:str='table',store=None):
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     data = pd.DataFrame(data={'y':[f'error: y = {y}'],'by':[f'error: by = {by}'],sub_cat:[f'error: sub_cat = {sub_cat}']})  
 
     try:        
@@ -369,8 +376,7 @@ def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=[
         data = df.groupby(by=group_columns).agg(statistics)
 
         if store not in [None,'None','none']:
-            DATA_TABLE['table']._sub_frames.append(store)
-            DATA_TABLE['table'].add_sub_frame(sub_frame_name=store)
+            DATA_TABLE['table'].add_sub_frame(sub_frame_name=store,df=data)
            
     except Exception as e: 
         print(e)   
@@ -381,7 +387,7 @@ def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=[
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -423,7 +429,9 @@ def get_group_by(df:pd.DataFrame,y:str=None,by:str=None,sub_cat:str=None,stats=[
     } 
 
 # sql
-def get_data(df:pd.DataFrame,output_type:str='table',show='100',query:str='SELECT * FROM df'):
+def get_data(dt:DataTable=None,df:str=None,output_type:str='table',show='100',query:str='SELECT * FROM df'):
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     data = duckdb.query(query).to_df()
     data = data.head(show) if show != 'all' else data
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
@@ -433,10 +441,10 @@ def get_data(df:pd.DataFrame,output_type:str='table',show='100',query:str='SELEC
             'output_type':output_type,
             'args':{
                 'df':{
-                    'type':'category',
-                    'options':['df'],
-                    'default':f"'df'"
-                    },
+                'type':'category',
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
+                'default':f"'df'"
+                },
                 'output_type':{
                     'type':'category',
                     'options':[f"'table'",f"'text'"],
@@ -456,7 +464,7 @@ def get_data(df:pd.DataFrame,output_type:str='table',show='100',query:str='SELEC
             }  
 
 # plots for plots
-def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_mean=False,category_mean=True,std_lines=True):
+def get_box_plot(dt:DataTable=None,df:str=None,y:str=None,by:str=None,orient:str='v',overall_mean=False,category_mean=True,std_lines=True):
     def set_axis_style(ax,y:str,x:str,orient=orient):
         if orient == 'v':
             ax.set_xlabel(x, fontsize=12, fontfamily=CONFIG['Chart']['font'], color=CONFIG['Chart']['font_color'])
@@ -471,7 +479,9 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_linewidth(1)
         ax.spines['bottom'].set_linewidth(1)
-        
+
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]  
     MAX_CATEGORIES = 30
     LEGEND_SIZE = 2
     NUM_OF_CATEGORIES = 1 if by in [None,'none','None'] else min(len(df[by].unique()),MAX_CATEGORIES)
@@ -501,7 +511,7 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -536,7 +546,7 @@ def get_box_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='v',overall_m
             }
         }
     }
-def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
+def get_count_plot(dt:DataTable=None,df:str=None,y:str=None,by:str=None,orient:str='h'):
     def get_num_of_categories(df:pd.DataFrame=df,y:str=y,by:str=by):
         y_amount = 1 if y in [None,'none','None'] else len(df[y].unique())
         by_amount = 1 if by in [None,'none','None'] else len(df[by].unique())
@@ -559,7 +569,9 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
                     return min(max(5,max_data_to_category),10)
             except:        
                 return 5 
-        
+
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df] 
     NUM_OF_CATEGORIES = get_num_of_categories(df,y,by)
     HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
 
@@ -578,7 +590,7 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -598,7 +610,7 @@ def get_count_plot(df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
             }
         }
     }
-def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
+def get_scatter_plot(dt:DataTable=None,df:str=None,y:str=None,x:str=None,by:str=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
         ax.set_ylabel(y, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
@@ -607,6 +619,8 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     WIDTH = 7 if df.shape[0] < 1000 else 10
     HEIGHT = 6 
     POINT_SIZE = 5 if len(df) > 1000 else 8 if len(df) > 200 else 9
@@ -628,7 +642,7 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -648,7 +662,7 @@ def get_scatter_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
             }
         }
     }
-def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
+def get_line_plot(dt:DataTable=None,df:str=None,y:str=None,x:str=None,by:str=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
         ax.set_ylabel(y, fontsize=11, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
@@ -657,6 +671,8 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
     
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     WIDTH = 7 if df.shape[0] < 1000 else 10
     HEIGHT = 6 
     fig, ax = plt.subplots(figsize=(WIDTH+2,HEIGHT),dpi=80)
@@ -675,7 +691,7 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -695,11 +711,13 @@ def get_line_plot(df:pd.DataFrame,y:str=None,x:str=None,by:str=None):
             }
         }
     }
-def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient='h',category_stats=True,overall_stats=False):
+def get_dist_plot(dt:DataTable=None,df:str=None,y:str=None,by:str=None,stat:str='count',orient='h',category_stats=True,overall_stats=False):
     def get_num_of_categories(df:pd.DataFrame=df,by:str=by):
         categories = 1 if by in [None,'none','None'] else len(df[by].unique())
         return min(categories,10)
 
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     NUM_OF_CATEGORIES = get_num_of_categories(df,by)
     WIDTH = max(7,NUM_OF_CATEGORIES) if orient == 'v' else 5
     HEIGHT = 5 if orient == 'v' else max(7,NUM_OF_CATEGORIES)
@@ -714,7 +732,7 @@ def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -749,8 +767,10 @@ def get_dist_plot(df:pd.DataFrame,y:str=None,by:str=None,stat:str='count',orient
             }
         }
     }
-def get_pie_plot(df:pd.DataFrame,y:str=None,stat:str='percent'):
+def get_pie_plot(dt:DataTable=None,df:str=None,y:str=None,stat:str='percent'):
     
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     fig, ax = plt.subplots(figsize=(5,5),dpi=80)
 
     try:
@@ -766,7 +786,7 @@ def get_pie_plot(df:pd.DataFrame,y:str=None,stat:str='percent'):
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -1240,7 +1260,7 @@ def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str
         pass  
 
 # analysis 
-def get_feature_importance(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None,y:str=None,trees:int=100,exclude_outliers='False'):
+def get_feature_importance(dt:DataTable=None,df:str=None,y:str=None,trees:int=100,exclude_outliers='False'):
     def set_log(dt,y,trees=100):
 
         return textwrap.dedent(f"""\
@@ -1266,7 +1286,8 @@ def get_feature_importance(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None
             else:    
                 return DecisionTreeClassifier(random_state=42)
 
-    dt = DATA_TABLE['table']
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]
     table = pd.DataFrame()
     log = set_log(dt=dt, y=y,trees=trees)
     fig, ax = plt.subplots(figsize=(8,int(len(df.columns)/3)), dpi=80)
@@ -1319,8 +1340,8 @@ def get_feature_importance(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None
         'args':{
             'df':{
                 'type':'category',
-                'options':dt._sub_frames,
-                'default':f"'dt'"
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
+                'default':f"'df'"
             },
             'y':{
                 'type':'category',
@@ -1339,10 +1360,9 @@ def get_feature_importance(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None
             }
         }
     }    
-
-def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:float=0.8,yearly_seasonality=False,weekly_seasonality=False,changepoint_prior_scale:float=0.05,seasonality_prior_scale:float=10.0,seasonality_mode:str='additive'):
-    def set_log(df,y,x,training_size=0.8):
-
+def get_timeseries_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,training_size:float=0.8,yearly_seasonality=False,weekly_seasonality=False,changepoint_prior_scale:float=0.05,seasonality_prior_scale:float=10.0,seasonality_mode:str='additive'):
+    def set_log(dt,y,x,training_size=0.8):
+        df= dt._df
         try:
             df_cv = cross_validation(
             model,
@@ -1362,22 +1382,24 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
             metric = pd.DataFrame()
 
         return textwrap.dedent(f"""\
-        Time Series Analysis:
-        ---------------------
-        df = '{DATA_TABLE["file_name"]}'
-        y  = '{y}' 
-        x  = '{x}' 
+                                Time Series Analysis:
+                                ---------------------
+                                data table = '{dt._file_name}'
+                                y  = '{y}' 
+                                x  = '{x}' 
 
-        performance metrics:
-        {metric}
-    """)
+                                performance metrics:
+                                {metric}
+                            """)
 
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]  
     fig = plt.figure(figsize=(20,7), dpi=80)
     gs = gridspec.GridSpec(6,2, width_ratios=[10,4])
     FORECAST_COLOR = get_darker_color(CONFIG['Chart']['data_colors'][0],20)
 
     table = pd.DataFrame()
-    log = set_log(df=df, y=y, x=x)
+    log = set_log(dt=dt, y=y, x=x)
 
     if x not in [None, 'none', 'None']:
         components = ['trend', 'weekly', 'yearly']
@@ -1405,7 +1427,7 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
         df_plot['day_norm_value'] = df_plot['y'] - (df_plot['trend'] + df_plot['yearly'])
 
         # evaluating performance
-        log = set_log(df,y,x,training_size=training_size)
+        log = set_log(dt,y,x,training_size=training_size)
 
         # Define axes
         ax_main = fig.add_subplot(gs[0:4, 0])
@@ -1470,7 +1492,7 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -1515,9 +1537,7 @@ def get_timeseries_analysis(df:pd.DataFrame,y:str=None,x:str=None,training_size:
             }
         }
     }
-    
-
-def get_anomaly_analysis(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None,x1:str=None,x2:str=None,by:str=None,contamination:float=0.03,n_neighbors:int=20):
+def get_anomaly_analysis(dt:DataTable=None,df:str=None,x1:str=None,x2:str=None,by:str=None,contamination:float=0.03,n_neighbors:int=20):
     def set_log(dt,x1,x2,by,contamination,n_neighbors):
         return textwrap.dedent(f"""\
                                 Anomaly Analysis:
@@ -1542,7 +1562,8 @@ def get_anomaly_analysis(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None,x
             ax[i].spines['top'].set_visible(False)
             ax[i].spines['right'].set_visible(False)
 
-    df = dt._df        
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]      
     fig, ax = plt.subplots(2,1,figsize=(8,10),dpi=80,sharex=True,constrained_layout=True)
     log = set_log(dt,x1,x2,by,contamination,n_neighbors)
     set_axis_style(ax=ax,x1=x1,x2=x2)
@@ -1568,7 +1589,7 @@ def get_anomaly_analysis(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None,x
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'x1':{
@@ -1598,16 +1619,14 @@ def get_anomaly_analysis(dt:DataTable=DATA_TABLE['table'],df:pd.DataFrame=None,x
             }
         }
     }
-
-
-def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
-    def set_log(df,y,by,alpha):
+def get_chi2_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,alpha:float=0.05):
+    def set_log(dt,y,by,alpha):
         ct = pd.crosstab(df[by], df[y])
         chi2, p, dof, expected = stats.chi2_contingency(ct)
         return textwrap.dedent(f"""\
                 Chi-Squared Analysis:
                 ---------------------
-                df = '{DATA_TABLE["file_name"]}'
+                data frame = '{dt._file_name}'
                 y = '{y}' (= Response column)
                 by = {by} 
                 α = {alpha} (= Significance level)
@@ -1623,10 +1642,12 @@ def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
                 Decision: {'Reject H0 (dependent)' if p < alpha else 'Fail to reject H0 (independent)'}
                 """)
     
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]  
     fig, axes = plt.subplots(2,1, figsize=(30,4),dpi=80,constrained_layout=True)
     ct = pd.DataFrame()
     try:
-        log = set_log(df,y,by,alpha)
+        log = set_log(dt,y,by,alpha)
     except:
         log = 'Error: No data to analyze'
 
@@ -1658,7 +1679,7 @@ def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -1678,23 +1699,25 @@ def get_chi2_analysis(df:pd.DataFrame,y:str=None,by:str=None,alpha:float=0.05):
             }
         }
     }
-def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,contamination:float=0.03):
-    def set_log(df,y,x,by,contamination):
+def get_correlation_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,by:str=None,contamination:float=0.03):
+    def set_log(dt,y,x,by,contamination):
         return textwrap.dedent(f"""\
         Correlation Analysis (= Numeric vs Numeric):
         --------------------------------------------
-        df = '{DATA_TABLE["file_name"]}'
+        df = '{dt._file_name}'
         y  = '{y}'  (= Response column)
         X  = '{x}'  (= Predictor column)
         by = '{by}'
         Contamination = {contamination}  (= Ignored % of data points)
     """)
 
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df] 
     fig = plt.figure(figsize=(6,7), dpi=80,constrained_layout=True)
     gs = gridspec.GridSpec(2, 2, width_ratios=[5,1], height_ratios=[1,5], wspace=0.05, hspace=0.05)
 
     #set_axis_style(ax=ax,y=y,x=by)
-    log = set_log(df,y,x,by,contamination)
+    log = set_log(dt,y,x,by,contamination)
     table = pd.DataFrame(columns=['category','count','included','ignored','equation','r2','rmse'])
     
 
@@ -1789,7 +1812,7 @@ def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,c
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -1814,7 +1837,7 @@ def get_correlation_analysis(df:pd.DataFrame,y:str=None,x:str=None,by:str=None,c
             }
         }
     }
-def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:float=0.03):
+def get_anova_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,contamination:float=0.03):
     def set_log(df,y,by,contamination):
 
         try:
@@ -1892,6 +1915,8 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         ax.spines['left'].set_linewidth(1)
         ax.spines['bottom'].set_linewidth(1)
 
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df]  
     TTEST_ALPHA = 0.05
     OPACITY = 0.4
     LEGEND_SIZE = 120
@@ -1966,7 +1991,7 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -1986,7 +2011,7 @@ def get_anova_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination:floa
             }
         }
     }
-def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0.03,decision_column='False'):
+def get_outliers_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,contamination=0.03,decision_column='False'):
     def set_log(y,by,contamination):
         return textwrap.dedent(f'''\
                 Outliers Detection:
@@ -2046,6 +2071,8 @@ def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0
         ax[1].spines['left'].set_linewidth(1)
         ax[1].spines['bottom'].set_linewidth(1)
 
+    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    df = dt._sub_frames[df] 
     fig, ax = plt.subplots(2,1,figsize=(10,5),dpi=80,sharex='all')
     log = set_log(y,by,contamination)
     set_axis_style(ax=ax,y=y,x=by)
@@ -2129,7 +2156,7 @@ def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0
         'args':{
             'df':{
                 'type':'category',
-                'options':['df'],
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
                 'default':f"'df'"
             },
             'y':{
@@ -2155,172 +2182,4 @@ def get_outliers_analysis(df:pd.DataFrame,y:str=None,by:str=None,contamination=0
         }
     }
 
-    def get_stats(data):
-        return {
-            'count':len(data),
-            'min':data.min(),
-            'max':data.max(),
-            'mean':data.mean(),
-            'median':data.median(),
-            'skewness':(3*(data.mean() - data.median()))/data.std() if data.std() != 0 else 0,
-            'std':data.std(),
-            'q1':data.quantile(0.25),
-            'q3':data.quantile(0.75),
-            'lcl':data.quantile(0.003),
-            '-3*std':data.quantile(0.003),
-            'ucl':data.quantile(0.997),
-            '+3*std':data.quantile(0.997),
-            'iqr':data.quantile(0.75) - data.quantile(0.25),
-            'IQR':f"[{data.quantile(0.25)}:{data.quantile(0.75)}]",
-            'lower_whisker':max(data.min(), data.quantile(0.25) - 1.5 * (data.quantile(0.75) - data.quantile(0.25))),
-            'upper_whisker':min(data.max(), data.quantile(0.75) + 1.5 * (data.quantile(0.75) - data.quantile(0.25))),
-            'outliers':[]
-        }
-    def set_vlines(ax,stats:{},keys:{}):
-        for key,color in keys.items():
-            #print(f"{key}:{stats[key]}(color={color})")
-            LABEL,VALUE,COLOR = key,stats[key],color
-            ax.axvline(VALUE, color=COLOR, linestyle='-',linewidth=2) #label=f'{LABEL} = {VALUE:.2f}'
-            ax.text(VALUE, 0, LABEL, horizontalalignment="center", verticalalignment="top", transform=ax.get_xaxis_transform(), rotation=45,color=COLOR)           
-    def set_data(data:pd.DataFrame,x:str,outliers=None):
-        #inliers_data,outliers_data = pd.DataFrame(columns=data.columns), pd.DataFrame(columns=data.columns)
-        STATS = get_stats(data[x])
-
-        if any([item in outliers for item in ['iqr','IQR']]):
-            #print(' >>> iqr')
-            outliers_data = data.loc[(data[x] < STATS['lower_whisker'])|(data[x] > STATS['upper_whisker']),:].copy()
-            inliers_data = data.loc[(data[x] >= STATS['lower_whisker'])&(data[x] <= STATS['upper_whisker']),:].copy()
-        elif '%' in outliers:     
-            #print(' >>> %')
-            perc_string = outliers.split('_')[1]
-            PERCENTAGE = float(perc_string[:perc_string.find('%')])
-            #print(f" >>> PERCENTAGE={PERCENTAGE}")
-            iso_forest = IsolationForest(n_estimators=200, contamination=PERCENTAGE/100, random_state=42)
-            data['inlier'] = iso_forest.fit_predict(data[[x]])
-            outliers_data = data.loc[data['inlier']==-1,:].drop('inlier', axis=1).copy()
-            inliers_data = data.loc[data['inlier']==1,:].drop('inlier', axis=1).copy()
-        else: # outliers in [None,"None",'none']
-            #print(' >>> no outliers')    
-            inliers_data = data.loc[:,:].copy()
-            outliers_data = data.loc[0:-1,:].copy()
-
-        #print(f" >>> inliers_data={len(inliers_data)}\n >>> outliers_data={len(outliers_data)}")
-        return inliers_data,outliers_data
-    def set_kde(ax,data,color='#d89fee'):
-        kde_x = np.linspace(data.values.min(), data.values.max(),max(100,int((len(data))**0.5)))
-        kde_y = gaussian_kde(data.values)(np.linspace(data.values.min(), data.values.max(),max(100,int((len(data))**0.5))))
-        ax.twinx().plot(kde_x,kde_y, color=get_darker_color(color,30), label='Density', linewidth=2)   
-
-    if x in [None,'none','None']:
-        x = list(df.select_dtypes(include=['number']).columns)[0]  
-
-    data= df[[x]].dropna().reset_index(drop=True) if by in ['none','None',None] else df[[x,by]].dropna().reset_index(drop=True)
-    inliers_data,outliers_data = set_data(data=data,x=x,outliers=outliers)
-    STATS = get_stats(data[x])    
-    st = { # summary table
-            'category':['all'],
-            'count':[f"{STATS['count']:.2f}"],
-            'min':[f"{STATS['min']:.2f}"],
-            'mean':[f"{STATS['mean']:.2f}"],
-            'median':[f"{STATS['median']:.4f}"],
-            'std':[f"{STATS['std']:.2f}"],
-            'max':[f"{STATS['max']:.2f}"],
-            'IQR':[f"[{STATS['q1']:.2f}:{STATS['q3']:.2f}]"],
-            'skewness':[f"{STATS['skewness']:.2f}"],
-            'outliers':[len(outliers_data)]
-            }
-
-    if by in [None,'none','None']:
-        POINT_SIZE = 5 if len(inliers_data) > 1000 else 8 if len(inliers_data) > 200 else 9
-        ALPHA = 0.1 if len(inliers_data) > 1000 else 0.4 if len(inliers_data) > 200 else 0.6
-        HEIGHT = 3
-        fig, axs = plt.subplots(2,1,figsize=(6,HEIGHT),dpi=75,sharex=True,gridspec_kw={'height_ratios': [HEIGHT,3]})
-
-        sns.stripplot(inliers_data[x],ax=axs[0],orient='h',alpha=ALPHA,size=POINT_SIZE,linewidth=0.5,color=CONFIG['Chart']['data_colors'][0],edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][0],70),jitter=0.35,zorder=0) 
-        if any([item in outliers for item in ['exclude','Exclude','EXCLUDE']]):
-            STATS = get_stats(inliers_data[x])
-            sns.boxplot(inliers_data[x],linewidth=2,orient='h',boxprops={"facecolor": "none", "edgecolor": "black", "linewidth": 1.5},showfliers=False, ax=axs[0])
-            axs[1].hist(inliers_data[x],bins=min(len(inliers_data[x]),50),color=CONFIG['Chart']['data_colors'][0],edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][0],70), alpha=0.3)
-            if len(inliers_data) > 100:
-                set_kde(ax=axs[1],data=inliers_data[x],color=CONFIG['Chart']['data_colors'][0])
-        else:
-            STATS = get_stats(data[x])
-            sns.stripplot(outliers_data[x],ax=axs[0],orient='h',alpha=0.4,size=POINT_SIZE,linewidth=0.5,color='red',edgecolor=get_darker_color(CONFIG['Chart']['frame_color'],70),jitter=0.3,zorder=0)   
-            sns.boxplot(data[x],linewidth=2,boxprops={"facecolor": "none", "edgecolor": "black", "linewidth": 1.5},showfliers=False, ax=axs[0])    
-            axs[1].hist(data[x],bins=min(len(data[x]),50),color=CONFIG['Chart']['data_colors'][0],edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][0],70), alpha=0.3)
-            if len(data[x]) > 100:
-                    set_kde(ax=axs[1],data=data[x],color=CONFIG['Chart']['data_colors'][0])
-
-    else: # by categories
-        POINT_SIZE = 5 if len(data) > 1000 else 8 if len(data) > 200 else 9
-        HEIGHT = int(1.5*len(data[by].unique()))
-        fig, axs = plt.subplots(2,1,figsize=(6,HEIGHT),dpi=75,sharex=True,gridspec_kw={'height_ratios': [HEIGHT,3]})
-
-        if any([item in outliers for item in ['exclude','Exclude','EXCLUDE']]):
-            sns.boxplot(x=inliers_data[x],y=inliers_data[by],orient='h',linewidth=2,boxprops={"facecolor": "none", "edgecolor": "black", "linewidth": 1.5},showfliers=False, ax=axs[0])
-        else:
-            sns.boxplot(x=data[x],y=data[by],linewidth=2,orient='h',boxprops={"facecolor": "none", "edgecolor": "black", "linewidth": 1.5},showfliers=False, ax=axs[0])
-
-        for i,cat in enumerate(data[by].unique()):
-            
-            COLOR_INDEX = i % len(CONFIG['Chart']['data_colors'])
-            ALPHA = 0.1 if len(data[data[by]==cat]) > 1000 else 0.4 if len(data[data[by]==cat]) > 200 else 0.6
-            inliers_data,outliers_data = set_data(data=data.loc[data[by]==cat],x=x,outliers=outliers)
-            #print(f" >>> category={cat}, inliers={len(inliers_data)}, outliers={len(outliers_data)}")
-
-            # update summary table
-            STATS = get_stats(data.loc[data[by]==cat,x]) 
-            for key in st.keys():
-                st[key].append(len(outliers_data) if key=='outliers' else cat if key=='category' else STATS[key])
-
-            sns.stripplot(x=inliers_data.loc[inliers_data[by]==cat,x],y=[cat]*len(inliers_data.loc[inliers_data[by]==cat,x]),ax=axs[0],orient='h',alpha=ALPHA,size=POINT_SIZE,linewidth=0.5,color=CONFIG['Chart']['data_colors'][COLOR_INDEX],edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70),jitter=0.35,zorder=0) 
-            if any([item in outliers for item in ['exclude','Exclude','EXCLUDE']]):
-                STATS = get_stats(inliers_data[x])
-                axs[1].hist(inliers_data.loc[inliers_data[by]==cat,x],bins=min(len(inliers_data.loc[inliers_data[by]==cat,x]),50),color=CONFIG['Chart']['data_colors'][COLOR_INDEX],edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70), alpha=0.3)
-                set_kde(ax=axs[1],data=inliers_data.loc[inliers_data[by]==cat,x],color=CONFIG['Chart']['data_colors'][COLOR_INDEX])
-            else:    
-                sns.stripplot(x=outliers_data[x],y=[cat]*len(outliers_data.loc[outliers_data[by]==cat,:]),ax=axs[0],orient='h',alpha=0.4,size=POINT_SIZE,linewidth=0.5,color='red',edgecolor=get_darker_color(CONFIG['Chart']['frame_color'],70),jitter=0.3,zorder=0)   
-                axs[1].hist(data.loc[data[by]==cat,x],bins=min(len(data.loc[data[by]==cat,x]),50),color=CONFIG['Chart']['data_colors'][COLOR_INDEX],edgecolor=get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],70), alpha=0.3)
-                set_kde(ax=axs[1],data=data.loc[data[by]==cat,x],color=CONFIG['Chart']['data_colors'][COLOR_INDEX])
-
-            #set_vlines(ax=axs[1],stats=STATS,keys={'mean':get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],60),'median':get_darker_color(CONFIG['Chart']['data_colors'][COLOR_INDEX],30)})   
     
-    for side in ['top','bottom','right','left']: 
-        axs[0].spines[side].set_linewidth(1)
-        axs[1].spines[side].set_linewidth(1)
-    
-    plt.tight_layout()
-    axs[0].set(xlabel=None)
-    axs[0].set(ylabel=None)
-    axs[1].set_ylabel("Count")
-    axs[1].twinx().set_ylabel("Density")
-    axs[1].legend()
-
-    return {
-        'output':fig,
-        'output_type':'chart',
-        'title':f'"{x}" Values distribution:',
-        'table':pd.DataFrame(st),
-        'args':{
-            'df':{
-                'type':'category',
-                'options':['df'],
-                'default':f"'df'"
-            },
-            'x':{
-                'type':'category',
-                'options':[f'"{item}"' for item in list(df.select_dtypes(include=['number']).columns)],
-                'default':list(df.select_dtypes(include=['number']).columns)[0]
-                },
-            'by':{
-                'type':'category',
-                'options':["None"] + [f"'{item}'" for item in get_categorical_columns(df=df,max_categories=30)],
-                'default':'None'
-                },
-            'outliers':{
-                'type':'category',
-                'options':[f'"None"',f'"show_IQR"',f'"show_0.3%"',f'"show_0.5%"',f'"show_1%"',f'"show_5%"',f'"exclude_IQR"',f'"exclude_0.3%"',f'"exclude_0.5%"',f'"exclude_1%"',f'"exclude_5%"'],
-                'default':'None'
-            }
-            }
-        }
