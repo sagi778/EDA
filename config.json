@@ -8,7 +8,7 @@
         "focus": {
             "color":"#4e4e4e",
             "background-color": "white",
-            "border-color": "#dedede"
+            "border-color": "#89CFF0"
         }
     },
     "FileExplorer":{
@@ -18,7 +18,7 @@
         "color": "#34495e"
     },
     "DataViewer":{
-        "border":"1px solid #dedede",
+        "border":"0px solid #dedede",
         "hover-color":"#f4f4f4",
         "selected-tab-color":"#ebf5fb",
         "unselected-tab-color":"#616a6b"

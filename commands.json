@@ -1,14 +1,14 @@
 {
     "Preview":[
-        "get_preview(df='df',rows=5,end='head',output_type='table')",
-        "get_shape(df='df',output_type='table')",
-        "get_columns_info(df='df',show='all',output_type='table',store=None)",
-        "get_group_by(df='df',y=None,by=None,sub_cat=None,stats=['mean'],sort='descending',output_type='table',store=None)",
-        "get_numerics_desc(df='df',show='all',output_type='table')",
-        "get_categorical_desc(df='df',show='all',outliers=0,output_type='table')"
+        "get_preview(df='df',rows=5,end='head',output_type='table',new_df=None)",
+        "get_shape(df='df',output_type='table',new_df=None)",
+        "get_columns_info(df='df',show='all',output_type='table',new_df=None)",
+        "get_group_by(df='df',y=None,by=None,sub_cat=None,stats=['mean'],sort='descending',output_type='table',new_df=None)",
+        "get_numerics_desc(df='df',show='all',output_type='table',new_df=None)",
+        "get_categorical_desc(df='df',show='all',outliers=0,output_type='table',new_df=None)"
     ],
     "SQL":[
-        "get_data(df='df',output_type='table',show=100,query='SELECT * FROM df')"
+        "get_data(df='df',output_type='table',show=100,query='SELECT * FROM df',new_df=None)"
     ],
     "Plots":[
         "get_pie_plot(df='df',y=None,stat='percent')",
@@ -21,12 +21,16 @@
     "Analysis":[
         "get_feature_importance(df='df',y=None,trees=100,exclude_outliers='False')",
         "get_anomaly_analysis(df='df',x1=None,x2=None,by=None,contamination=0.03,n_neighbors=20)",
-        "get_timeseries_analysis(df='df',y=None,x=None,training_size=0.8,yearly_seasonality=False,weekly_seasonality=False,changepoint_prior_scale=0.05,seasonality_prior_scale=10.0,seasonality_mode='additive')",
         "get_correlation_analysis(df='df',y=None,x=None,by=None,contamination=0.03)",
         "get_anova_analysis(df='df',y=None,by=None,contamination=0.03)",
         "get_outliers_analysis(df='df',y=None,by=None,contamination=0.03,decision_column='False')",
         "get_chi2_analysis(df='df',y=None,by=None,alpha=0.05)"
+    ],
+    "Time":[
+        "get_timeseries_analysis(df='df',y=None,x=None,training_size=0.8,yearly_seasonality=False,weekly_seasonality=False,changepoint_prior_scale=0.05,seasonality_prior_scale=10.0,seasonality_mode='additive')",
+        "get_process_ctrl_analysis(df='df',y=None,x=None,sample_size=20,training_size=0.7)"
     ]
+
 }
     
     

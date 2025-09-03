@@ -6,7 +6,7 @@ from tabulate import tabulate
 import calendar
 import os
 import json
-import re
+import re, ast
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -110,6 +110,9 @@ class DataTable():
 
         self.update_file_tree()
 
+    def __str__(self):
+        return f" file_name = {self._file_name}\n path = {self._path}\n file_type = {self._file_type}\n sub_frames = {list(self._sub_frames.keys())}\n"    
+
     def update_file_tree(self):
         self._file_tree.add_file(file_name=self._file_name, file_path=self._path)
     def read_data_file(self,file_full_path:str):
@@ -133,7 +136,8 @@ class DataTable():
 
 # load data
 DATA_TABLE = {'file_tree':None,
-              'table':None, ##
+              'tables':[], 
+              'current_table_index':None,
               'path':CURRENT_PATH,
               #'file_name':None,
               #'df':None,
@@ -154,13 +158,32 @@ def get_categorical_columns(df:pd.DataFrame,max_categories=30):
 def get_numeric_columns(df:pd.DataFrame,min_uniques=10):
     '''return columns with > 10 unique values or numeric by type'''
     return [col for col in df.columns if len(df[col].unique()) > min_uniques or col in df.select_dtypes(include=['number'])]    
+def get_time_columns(df: pd.DataFrame):
+    time_cols = []
+    for col in df.columns:
+        dtype = df[col].dtype
+
+        # already datetime or timedelta
+        if pd.api.types.is_datetime64_any_dtype(dtype) or pd.api.types.is_timedelta64_dtype(dtype):
+            time_cols.append(col)
+            continue
+
+        # try parseable strings/numeric
+        converted = pd.to_datetime(df[col], errors='coerce', infer_datetime_format=True)
+        if converted.notna().any():
+            time_cols.append(col)
+    return time_cols
 
 # preview
-def get_shape(dt:DataTable=None,df:str=None,output_type:str='table'):
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+def get_shape(dt:DataTable=None,df:str=None,output_type:str='table',new_df:str=None):
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     data = pd.DataFrame(data=df.shape,columns=['#'],index=['rows','columns']).T
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql') # rounded_grid/psql
+    
+    if new_df not in [None,'None','none']:
+        DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=data)
+
     return {
         'output':data,
         'output_type':output_type,
@@ -174,11 +197,16 @@ def get_shape(dt:DataTable=None,df:str=None,output_type:str='table'):
                 'type':'category',
                 'options':[f"'table'",f"'text'"],
                 'default':'table'
-                }
-                }
+            },
+            'new_df':{
+                'type':'text',
+                'options':['"df_shape"'],
+                'default':'"df_shape"'
+            }
+            }
         }  
-def get_preview(dt:DataTable=None,df:str=None,rows:int=5,end:str='head',output_type:str='table'):
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+def get_preview(dt:DataTable=None,df:str=None,rows:int=5,end:str='head',output_type:str='table',new_df:str=None):
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     if rows >= len(df):
         data = df 
@@ -192,6 +220,9 @@ def get_preview(dt:DataTable=None,df:str=None,rows:int=5,end:str='head',output_t
         data = pd.DataFrame() 
 
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')  
+
+    if new_df not in [None,'None','none']:
+        DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=data)
 
     return {
         'output':data,
@@ -216,11 +247,16 @@ def get_preview(dt:DataTable=None,df:str=None,rows:int=5,end:str='head',output_t
                 'type':'category',
                 'options':[f"'table'",f"'text'"],
                 'default':'table'
+            },
+            'new_df':{
+                'type':'text',
+                'options':['"df_preview"'],
+                'default':'"df_preview"'
             }
         }
         }
-def get_columns_info(dt:DataTable=None,df:str=None,show='all',output_type:str='table',store=None): 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+def get_columns_info(dt:DataTable=None,df:str=None,show='all',output_type:str='table',new_df:str=None): 
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     data = {'column':[],'type':[],'dtype':[],'unique':[],'Non-Nulls':[],'Nulls':[],'Non-Nulls%':[],'Nulls%':[]}
     numeric_cols = df.select_dtypes(include=['number'])
@@ -242,10 +278,8 @@ def get_columns_info(dt:DataTable=None,df:str=None,show='all',output_type:str='t
 
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
 
-    if store not in [None,'none','None']:
-        file_tree = DATA_TABLE['file_tree']
-        df_name = store if store not in [None,'none','None'] else 'df_column_info'
-        file_tree.add_subfile(parent_file=DATA_TABLE['file_name'],df_name=df_name)
+    if new_df not in [None,'None','none']:
+        DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=data)
 
     return {
         'output':data,
@@ -266,15 +300,15 @@ def get_columns_info(dt:DataTable=None,df:str=None,show='all',output_type:str='t
                 'options':[f"'table'",f"'text'"],
                 'default':"'table'"
             },
-            'store':{
+            'new_df':{
                 'type':'text',
                 'options':['"df_columns_info"'],
                 'default':'"df_columns_info"'
             }
             }
         }      
-def get_numerics_desc(dt:DataTable=None,df:str=None,show='all',output_type:str='table'):
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+def get_numerics_desc(dt:DataTable=None,df:str=None,show='all',output_type:str='table',new_df:str=None):
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     data = df.describe([.005,.25,.5,.75,.995]).T
     numeric_columns = list(data.index)
@@ -286,6 +320,10 @@ def get_numerics_desc(dt:DataTable=None,df:str=None,show='all',output_type:str='
         data = data[data.index == show]
 
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
+
+    if new_df not in [None,'None','none']:
+        DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=data)
+
     return {
         'output':data,
         'output_type':output_type,
@@ -304,11 +342,16 @@ def get_numerics_desc(dt:DataTable=None,df:str=None,show='all',output_type:str='
                 'type':'category',
                 'options':[f"'table'",f"'text'"],
                 'default':"'table'"
+            },
+            'new_df':{
+                'type':'text',
+                'options':['"df_numeric_info"'],
+                'default':'"df_numeric_info"'
             }
         }
         }    
-def get_categorical_desc(dt:DataTable=None,df:str=None,show='all',outliers='None',output_type:str='table'):
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+def get_categorical_desc(dt:DataTable=None,df:str=None,show='all',outliers='None',output_type:str='table',new_df:str=None):
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     categorical_columns = [col for col in df.columns if str(df[col].dtype) in ['object','category','bool']]
     df = df[categorical_columns].copy()
@@ -339,6 +382,10 @@ def get_categorical_desc(dt:DataTable=None,df:str=None,show='all',outliers='None
         data = data[data['column'] == show]
 
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
+
+    if new_df not in [None,'None','none']:
+        DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=data)
+
     return {
         'output':data,
         'output_type':output_type,
@@ -362,11 +409,16 @@ def get_categorical_desc(dt:DataTable=None,df:str=None,show='all',outliers='None
                 'type':'category',
                 'options':[f"'table'",f"'text'"],
                 'default':"'table'"
+            },
+            'new_df':{
+                'type':'text',
+                'options':['"df_category_info"'],
+                'default':'"df_category_info"'
             }
         }
     }    
-def get_group_by(dt:DataTable=None,df:str=None,y:str=None,by:str=None,sub_cat:str=None,stats=['mean'],sort:str='descending',output_type:str='table',store=None):
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+def get_group_by(dt:DataTable=None,df:str=None,y:str=None,by:str=None,sub_cat:str=None,stats=['mean'],sort:str='descending',output_type:str='table',new_df=None):
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     data = pd.DataFrame(data={'y':[f'error: y = {y}'],'by':[f'error: by = {by}'],sub_cat:[f'error: sub_cat = {sub_cat}']})  
 
@@ -375,8 +427,8 @@ def get_group_by(dt:DataTable=None,df:str=None,y:str=None,by:str=None,sub_cat:st
         statistics = {y:[stat for stat in stats]}
         data = df.groupby(by=group_columns).agg(statistics)
 
-        if store not in [None,'None','none']:
-            DATA_TABLE['table'].add_sub_frame(sub_frame_name=store,df=data)
+        if new_df not in [None,'None','none']:
+            DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=data)
            
     except Exception as e: 
         print(e)   
@@ -420,21 +472,24 @@ def get_group_by(dt:DataTable=None,df:str=None,y:str=None,by:str=None,sub_cat:st
                 'options':["'table'","'text'"],
                 'default':"'table'"
             },
-            'store':{
+            'new_df':{
                 'type':'text',
-                'options':[],
-                'default':"'None'"
-            }
+                'options':['"df_group_by"'],
+                'default':'"df_group_by"'
+            }  
         }
     } 
 
 # sql
-def get_data(dt:DataTable=None,df:str=None,output_type:str='table',show='100',query:str='SELECT * FROM df'):
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+def get_data(dt:DataTable=None,df:str=None,output_type:str='table',show='100',query:str='SELECT * FROM df',new_df:str=None):
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     data = duckdb.query(query).to_df()
     data = data.head(show) if show != 'all' else data
     data = data if output_type == 'table' else tabulate(data,headers='keys',tablefmt='psql')
+
+    if new_df not in [None,'None','none']:
+        DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=data)
 
     return {
             'output':data,
@@ -459,7 +514,12 @@ def get_data(dt:DataTable=None,df:str=None,output_type:str='table',show='100',qu
                     'type':'query',
                     'options':[f"'SELECT * FROM df LIMIT 10'"],
                     'default':"'SELECT * FROM df LIMIT 10'"
-                    },       
+                    },
+                'new_df':{
+                'type':'text',
+                'options':['"df_query"'],
+                'default':'"df_query"'
+                }           
                 }
             }  
 
@@ -480,7 +540,7 @@ def get_box_plot(dt:DataTable=None,df:str=None,y:str=None,by:str=None,orient:str
         ax.spines['left'].set_linewidth(1)
         ax.spines['bottom'].set_linewidth(1)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]  
     MAX_CATEGORIES = 30
     LEGEND_SIZE = 2
@@ -570,7 +630,7 @@ def get_count_plot(dt:DataTable=None,df:str=None,y:str=None,by:str=None,orient:s
             except:        
                 return 5 
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df] 
     NUM_OF_CATEGORIES = get_num_of_categories(df,y,by)
     HEIGHT, WIDTH = set_height(df=df,by=by,orient=orient,num_of_categories=NUM_OF_CATEGORIES), set_width(orient=orient,num_of_categories=NUM_OF_CATEGORIES)
@@ -619,7 +679,7 @@ def get_scatter_plot(dt:DataTable=None,df:str=None,y:str=None,x:str=None,by:str=
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     WIDTH = 7 if df.shape[0] < 1000 else 10
     HEIGHT = 6 
@@ -671,7 +731,7 @@ def get_line_plot(dt:DataTable=None,df:str=None,y:str=None,x:str=None,by:str=Non
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
     
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     WIDTH = 7 if df.shape[0] < 1000 else 10
     HEIGHT = 6 
@@ -716,7 +776,7 @@ def get_dist_plot(dt:DataTable=None,df:str=None,y:str=None,by:str=None,stat:str=
         categories = 1 if by in [None,'none','None'] else len(df[by].unique())
         return min(categories,10)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     NUM_OF_CATEGORIES = get_num_of_categories(df,by)
     WIDTH = max(7,NUM_OF_CATEGORIES) if orient == 'v' else 5
@@ -769,7 +829,7 @@ def get_dist_plot(dt:DataTable=None,df:str=None,y:str=None,by:str=None,stat:str=
     }
 def get_pie_plot(dt:DataTable=None,df:str=None,y:str=None,stat:str='percent'):
     
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     fig, ax = plt.subplots(figsize=(5,5),dpi=80)
 
@@ -1160,7 +1220,7 @@ def set_count_plot(ax,df:pd.DataFrame,y:str=None,by:str=None,orient:str='h'):
         ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
     except:
         pass     
-def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None):
+def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None,opacity=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
         ax.set_ylabel(y, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
@@ -1172,7 +1232,10 @@ def set_scatter_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:
         ax.spines['bottom'].set_linewidth(1)
 
     POINT_SIZE = 8 if len(df) > 1000 else 11 if len(df) > 200 else 15
-    ALPHA = 0.2 if len(df) > 1000 else 0.4 if len(df) > 200 else 0.6
+    if opacity in [None,'none','None']:
+        ALPHA = 0.2 if len(df) > 1000 else 0.4 if len(df) > 200 else 0.6
+    else:
+        ALPHA = opacity if (opacity <= 1 and opacity >= 0) else 0.6    
 
     if by in ['None','none',None]:
         ax.scatter(
@@ -1216,7 +1279,7 @@ def set_pie_plot(ax,df:pd.DataFrame,y:str=None,stat:str=['percent','count']):
         ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
     except:
         pass      
-def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None,max_x_labels:int=None):
+def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str=None,opacity=1,max_x_labels:int=None):
     def set_axis_style(ax,y:str,x:str):
         ax.set_xlabel(x, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
         ax.set_ylabel(y, fontsize=13, fontfamily='Ubuntu', color=CONFIG['Chart']['font_color'])
@@ -1231,6 +1294,7 @@ def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str
     if by in ['None','none',None]:
         ax.plot(
             df[x],df[y],
+            alpha=opacity,
             color=color if color not in [None,'none','None'] else CONFIG['Chart']['data_colors'][0],
             linewidth=LINE_WIDTH, label=f"{y}"
         )
@@ -1240,6 +1304,7 @@ def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str
             data = df.loc[df[by]==cat,[y,x,by]]
             ax.plot(
                 data[x],data[y],
+                alpha=opacity,
                 color=color if color not in [None,'none','None'] else CONFIG['Chart']['data_colors'][COLOR_INDEX],
                 linewidth=LINE_WIDTH, label=f"{cat}"
             )
@@ -1260,7 +1325,15 @@ def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str
         pass  
 
 # analysis 
+
 def get_feature_importance(dt:DataTable=None,df:str=None,y:str=None,trees:int=100,exclude_outliers='False'):
+    def set_axis_style(ax):
+        ax.set_xlabel(ax.get_xlabel() , fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
+        ax.set_ylabel(ax.get_ylabel() , fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
+        ax.tick_params(axis='x',labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        ax.tick_params(axis='y', labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
     def set_log(dt,y,trees=100):
 
         return textwrap.dedent(f"""\
@@ -1273,7 +1346,7 @@ def get_feature_importance(dt:DataTable=None,df:str=None,y:str=None,trees:int=10
         trees = {trees}
         Categorical features encoding: Categorical features are encoded as category mean value.
         Noise Thershold: Synthetic random noise feature importance
-    """)
+        """)
     def set_model_type(df:pd.DataFrame,y:str=None,trees=trees):
         if y in get_numeric_columns(df):
             if trees > 1:
@@ -1286,11 +1359,12 @@ def get_feature_importance(dt:DataTable=None,df:str=None,y:str=None,trees:int=10
             else:    
                 return DecisionTreeClassifier(random_state=42)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]
     table = pd.DataFrame()
     log = set_log(dt=dt, y=y,trees=trees)
     fig, ax = plt.subplots(figsize=(8,int(len(df.columns)/3)), dpi=80)
+    set_axis_style(ax=ax)
     data = df.copy()
 
     if y not in [None, 'none', 'None']:
@@ -1360,183 +1434,6 @@ def get_feature_importance(dt:DataTable=None,df:str=None,y:str=None,trees:int=10
             }
         }
     }    
-def get_timeseries_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,training_size:float=0.8,yearly_seasonality=False,weekly_seasonality=False,changepoint_prior_scale:float=0.05,seasonality_prior_scale:float=10.0,seasonality_mode:str='additive'):
-    def set_log(dt,y,x,training_size=0.8):
-        df= dt._df
-        try:
-            df_cv = cross_validation(
-            model,
-            initial=f'{int(training_size*len(df))} days',     # train size
-            period=f'{int((1-training_size)*0.5*len(df))} days',      # spacing between cutoffs
-            horizon=f'{int((1-training_size)*len(df))} days'      # forecast horizon
-            )
-            df_p = performance_metrics(df_cv)
-            m = df_p[['horizon', 'mae', 'rmse', 'mape']]
-            metric = {
-                'horizon':m['horizon'].mean(),
-                'mae':m['mae'].mean(),
-                'rmse':m['rmse'].mean(),
-                'mape':m['mape'].mean()
-                }
-        except:
-            metric = pd.DataFrame()
-
-        return textwrap.dedent(f"""\
-                                Time Series Analysis:
-                                ---------------------
-                                data table = '{dt._file_name}'
-                                y  = '{y}' 
-                                x  = '{x}' 
-
-                                performance metrics:
-                                {metric}
-                            """)
-
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
-    df = dt._sub_frames[df]  
-    fig = plt.figure(figsize=(20,7), dpi=80)
-    gs = gridspec.GridSpec(6,2, width_ratios=[10,4])
-    FORECAST_COLOR = get_darker_color(CONFIG['Chart']['data_colors'][0],20)
-
-    table = pd.DataFrame()
-    log = set_log(dt=dt, y=y, x=x)
-
-    if x not in [None, 'none', 'None']:
-        components = ['trend', 'weekly', 'yearly']
-        df[x] = pd.to_datetime(df[x])
-        data = df[[x, y]].rename(columns={x: 'ds', y: 'y'}).copy()
-        training_size = training_size if training_size < 1 and training_size > 0 else 0.8
-        train = data.iloc[:int(len(data) * training_size)]
-        test = data.iloc[int(len(data) * training_size):]
-        
-        model = Prophet(
-            changepoint_prior_scale=changepoint_prior_scale,     # trend flexibility
-            seasonality_prior_scale=seasonality_prior_scale,     # seasonality flexibility
-            yearly_seasonality=bool(yearly_seasonality),
-            weekly_seasonality=bool(weekly_seasonality),
-            seasonality_mode=seasonality_mode    # or 'multiplicative'
-            )
-        model.fit(train)
-        future = model.make_future_dataframe(periods=len(test)*2, freq='D')  # extend the future dataframe
-        forecast = model.predict(future)
-        df_plot = data.merge(forecast, on='ds', how='outer')
-        df_plot['day'] = df_plot['ds'].dt.day_name()
-        df_plot['month'] = df_plot['ds'].dt.month_name()
-        df_plot['residual'] = df_plot['y'] - df_plot['yhat']
-        df_plot['month_norm_value'] = df_plot['y'] - df_plot['trend']
-        df_plot['day_norm_value'] = df_plot['y'] - (df_plot['trend'] + df_plot['yearly'])
-
-        # evaluating performance
-        log = set_log(dt,y,x,training_size=training_size)
-
-        # Define axes
-        ax_main = fig.add_subplot(gs[0:4, 0])
-        ax_resid = fig.add_subplot(gs[4:6, 0],sharex=ax_main)
-        ax_trend = fig.add_subplot(gs[0:2, 1])
-        ax_yearly = fig.add_subplot(gs[2:4, 1])
-        ax_weekly = fig.add_subplot(gs[4:6, 1])
-
-        table = df_plot.tail(10) # monitor
-        set_line_plot(ax=ax_main, df=df_plot, y='yhat', x='ds', color=FORECAST_COLOR)
-        set_line_plot(ax=ax_main, df=df_plot, y='y', x='ds', color=CONFIG['Chart']['data_colors'][1])
-        ax_main.fill_between(df_plot['ds'], df_plot['yhat_lower'], df_plot['yhat_upper'], color=FORECAST_COLOR, alpha=0.2)
-        ax_main.set_ylabel("Forecast")
-        ax_main.spines['top'].set_visible(False)
-        ax_main.spines['right'].set_visible(False)
-
-        set_line_plot(ax=ax_resid, df=df_plot, y='residual', x='ds', color=CONFIG['Chart']['data_colors'][1])
-        ax_resid.set_ylabel("Residuals")
-        ax_resid.spines['top'].set_visible(False)
-        ax_resid.spines['right'].set_visible(False)
-
-        if 'trend' in df_plot.columns:
-            set_line_plot(ax=ax_trend, df=df_plot, y='trend', x='ds', color=FORECAST_COLOR)
-            ax_trend.fill_between(df_plot['ds'], df_plot['trend_lower'], df_plot['trend_upper'], color=FORECAST_COLOR, alpha=0.1)
-            ax_trend.set_ylabel("Trend")
-            ax_trend.set_xlabel(None)
-            ax_trend.spines['top'].set_visible(False)
-            ax_trend.spines['right'].set_visible(False)
-
-        if 'yearly' in df_plot.columns:
-            month_order = ['January', 'February', 'March', 'April', 'May', 'June','July', 'August', 'September', 'October', 'November', 'December']
-            df_plot['month'] = pd.Categorical(df_plot['month'], categories=month_order, ordered=True)
-            df_plot = df_plot.sort_values('month')
-            df_unique_months = df_plot[['month', 'yearly']].drop_duplicates(subset='month')
-            sns.lineplot(ax=ax_yearly, data=df_unique_months, x='month', y='yearly', color=FORECAST_COLOR, marker='o')
-            #sns.scatterplot(ax=ax_yearly, data=df_plot, x='month', y='month_norm_value', color=FORECAST_COLOR, alpha=0.3, s=10)
-            ax_yearly.set_ylabel("Yearly")
-            ax_yearly.set_xlabel(None)
-            ax_yearly.spines['top'].set_visible(False)
-            ax_yearly.spines['right'].set_visible(False)
-
-        if 'weekly' in df_plot.columns:
-            day_order = ['Sunday','Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-            df_plot['day'] = pd.Categorical(df_plot['day'], categories=day_order, ordered=True)
-            df_plot = df_plot.sort_values('day')
-            df_unique_days = df_plot[['day', 'weekly']].drop_duplicates(subset='day')
-            #set_line_plot(ax=ax_weekly, df=df_unique_days, y='weekly', x='day', color=FORECAST_COLOR,max_x_labels=len(day_order))
-            sns.lineplot(ax=ax_weekly, data=df_unique_days, x='day', y='weekly', color=FORECAST_COLOR, marker='o')
-            #set_strip_plot(ax=ax_weekly, df=df_plot, y='day_norm_value', by='day', orient='v', color=FORECAST_COLOR, opacity=0.3)
-            #set_box_plot(ax=ax_weekly, df=df_plot, y='yhat', by='day', orient='v', overall_mean=False, category_mean=True, std_lines=False, confidence_lines=False)
-            ax_weekly.set_ylabel("Weekly")
-            ax_weekly.set_xlabel(None)
-            ax_weekly.spines['top'].set_visible(False)
-            ax_weekly.spines['right'].set_visible(False)
-            
-        plt.tight_layout()    
-    
-
-    return {
-        'output':{'log':log,'plot':fig,'table':table},
-        'output_type':'analysis',
-        'args':{
-            'df':{
-                'type':'category',
-                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
-                'default':f"'df'"
-            },
-            'y':{
-                'type':'category',
-                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=10)],
-                'default':None
-            },
-            'x':{
-                'type':'category',
-                'options':[f"'{item}'" for item in df.select_dtypes(include=['datetime', 'datetimetz']).columns.tolist() + df.select_dtypes(include='object').columns.tolist()],
-                'default':'index'
-            },
-            'training_size':{
-                'type':'float',
-                'options':[0.9,0.8,0.7,0.6,0.5],
-                'default':0.8
-            },
-            'yearly_seasonality':{
-                'type':'category',
-                'options':["'False'","'True'"],
-                'default':"'False'"
-            },
-            'weekly_seasonality':{
-                'type':'category',
-                'options':["'False'","'True'"],
-                'default':"'False'"
-            },
-            'changepoint_prior_scale':{
-                'type':'float',
-                'options':[0.01,0.05,0.1,0.2],
-                'default':0.05
-            },
-            'seasonality_prior_scale':{
-                'type':'float',
-                'options':[1.0,0.5,10.0],
-                'default':10.0
-            },
-            'seasonality_mode':{
-                'type':'category',
-                'options':["'additive'","'multiplicative'"],
-                'default':"'additive'"
-            }
-        }
-    }
 def get_anomaly_analysis(dt:DataTable=None,df:str=None,x1:str=None,x2:str=None,by:str=None,contamination:float=0.03,n_neighbors:int=20):
     def set_log(dt,x1,x2,by,contamination,n_neighbors):
         return textwrap.dedent(f"""\
@@ -1562,7 +1459,7 @@ def get_anomaly_analysis(dt:DataTable=None,df:str=None,x1:str=None,x2:str=None,b
             ax[i].spines['top'].set_visible(False)
             ax[i].spines['right'].set_visible(False)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]      
     fig, ax = plt.subplots(2,1,figsize=(8,10),dpi=80,sharex=True,constrained_layout=True)
     log = set_log(dt,x1,x2,by,contamination,n_neighbors)
@@ -1642,7 +1539,7 @@ def get_chi2_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,alpha
                 Decision: {'Reject H0 (dependent)' if p < alpha else 'Fail to reject H0 (independent)'}
                 """)
     
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]  
     fig, axes = plt.subplots(2,1, figsize=(30,4),dpi=80,constrained_layout=True)
     ct = pd.DataFrame()
@@ -1711,7 +1608,7 @@ def get_correlation_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None
         Contamination = {contamination}  (= Ignored % of data points)
     """)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df] 
     fig = plt.figure(figsize=(6,7), dpi=80,constrained_layout=True)
     gs = gridspec.GridSpec(2, 2, width_ratios=[5,1], height_ratios=[1,5], wspace=0.05, hspace=0.05)
@@ -1915,18 +1812,18 @@ def get_anova_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,cont
         ax.spines['left'].set_linewidth(1)
         ax.spines['bottom'].set_linewidth(1)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df]  
     TTEST_ALPHA = 0.05
     OPACITY = 0.4
-    LEGEND_SIZE = 120
+    LEGEND_SIZE = 5
 
     try:
         log = set_log(df,y,by,contamination)
     except:
         log = 'No data to analyze'    
-    HEIGHT = LEGEND_SIZE + 1 if by in [None,'none','None'] else len(df[by].unique())
-    fig, ax = plt.subplots(figsize=(LEGEND_SIZE + 5,HEIGHT),dpi=80)
+    HEIGHT = 1 if by in [None,'none','None'] else len(df[by].unique())
+    fig, ax = plt.subplots(figsize=(11,HEIGHT),dpi=80)
     set_axis_style(ax=ax,y=y,x=by,orient='h')
     
     if y in [None,'none','None']:
@@ -1981,9 +1878,10 @@ def get_anova_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,cont
     ax.legend(
         bbox_to_anchor=(1.02, 1),  # x=1.02 (just outside right), y=1 (top)
         loc='upper left',          # anchor the upper left of the legend to this point
-        borderaxespad=0
+        borderaxespad=0,
+        frameon=False,
         )
-    #fig.tight_layout()          
+    fig.tight_layout()          
 
     return {
         'output':{'log':log,'plot':fig,'table':table},
@@ -2071,7 +1969,7 @@ def get_outliers_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,c
         ax[1].spines['left'].set_linewidth(1)
         ax[1].spines['bottom'].set_linewidth(1)
 
-    dt = DATA_TABLE['table'] if dt == None else DATA_TABLE['table']
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df] 
     fig, ax = plt.subplots(2,1,figsize=(10,5),dpi=80,sharex='all')
     log = set_log(y,by,contamination)
@@ -2182,4 +2080,296 @@ def get_outliers_analysis(dt:DataTable=None,df:str=None,y:str=None,by:str=None,c
         }
     }
 
+# time 
+def get_timeseries_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,training_size:float=0.8,yearly_seasonality=False,weekly_seasonality=False,changepoint_prior_scale:float=0.05,seasonality_prior_scale:float=10.0,seasonality_mode:str='additive'):
+    def set_log(dt,y,x,training_size=0.8):
+        df= dt._df
+        try:
+            df_cv = cross_validation(
+            model,
+            initial=f'{int(training_size*len(df))} days',     # train size
+            period=f'{int((1-training_size)*0.5*len(df))} days',      # spacing between cutoffs
+            horizon=f'{int((1-training_size)*len(df))} days'      # forecast horizon
+            )
+            df_p = performance_metrics(df_cv)
+            m = df_p[['horizon', 'mae', 'rmse', 'mape']]
+            metric = {
+                'horizon':m['horizon'].mean(),
+                'mae':m['mae'].mean(),
+                'rmse':m['rmse'].mean(),
+                'mape':m['mape'].mean()
+                }
+        except:
+            metric = pd.DataFrame()
+
+        return textwrap.dedent(f"""\
+                                Time Series Analysis:
+                                ---------------------
+                                data table = '{dt._file_name}'
+                                y  = '{y}' 
+                                x  = '{x}' 
+
+                                performance metrics:
+                                {metric}
+                            """)
+
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
+    df = dt._sub_frames[df]  
+    fig = plt.figure(figsize=(20,7), dpi=80)
+    gs = gridspec.GridSpec(6,2, width_ratios=[10,4])
+    FORECAST_COLOR = get_darker_color(CONFIG['Chart']['data_colors'][0],20)
+
+    table = pd.DataFrame()
+    log = set_log(dt=dt, y=y, x=x)
+
+    if x not in [None, 'none', 'None']:
+        components = ['trend', 'weekly', 'yearly']
+        df[x] = pd.to_datetime(df[x])
+        data = df[[x, y]].rename(columns={x: 'ds', y: 'y'}).copy()
+        training_size = training_size if training_size < 1 and training_size > 0 else 0.8
+        train = data.iloc[:int(len(data) * training_size)]
+        test = data.iloc[int(len(data) * training_size):]
+        
+        model = Prophet(
+            changepoint_prior_scale=changepoint_prior_scale,     # trend flexibility
+            seasonality_prior_scale=seasonality_prior_scale,     # seasonality flexibility
+            yearly_seasonality=bool(yearly_seasonality),
+            weekly_seasonality=bool(weekly_seasonality),
+            seasonality_mode=seasonality_mode    # or 'multiplicative'
+            )
+        model.fit(train)
+        future = model.make_future_dataframe(periods=len(test)*2, freq='D')  # extend the future dataframe
+        forecast = model.predict(future)
+        df_plot = data.merge(forecast, on='ds', how='outer')
+        df_plot['day'] = df_plot['ds'].dt.day_name()
+        df_plot['month'] = df_plot['ds'].dt.month_name()
+        df_plot['residual'] = df_plot['y'] - df_plot['yhat']
+        df_plot['month_norm_value'] = df_plot['y'] - df_plot['trend']
+        df_plot['day_norm_value'] = df_plot['y'] - (df_plot['trend'] + df_plot['yearly'])
+
+        # evaluating performance
+        log = set_log(dt,y,x,training_size=training_size)
+
+        # Define axes
+        ax_main = fig.add_subplot(gs[0:4, 0])
+        ax_resid = fig.add_subplot(gs[4:6, 0],sharex=ax_main)
+        ax_trend = fig.add_subplot(gs[0:2, 1])
+        ax_yearly = fig.add_subplot(gs[2:4, 1])
+        ax_weekly = fig.add_subplot(gs[4:6, 1])
+
+        table = df_plot.tail(10) # monitor
+        set_line_plot(ax=ax_main, df=df_plot, y='yhat', x='ds', color=FORECAST_COLOR)
+        set_line_plot(ax=ax_main, df=df_plot, y='y', x='ds', color=CONFIG['Chart']['data_colors'][1])
+        ax_main.fill_between(df_plot['ds'], df_plot['yhat_lower'], df_plot['yhat_upper'], color=FORECAST_COLOR, alpha=0.2)
+        ax_main.set_ylabel("Forecast")
+        ax_main.spines['top'].set_visible(False)
+        ax_main.spines['right'].set_visible(False)
+
+        set_line_plot(ax=ax_resid, df=df_plot, y='residual', x='ds', color=CONFIG['Chart']['data_colors'][1])
+        ax_resid.set_ylabel("Residuals")
+        ax_resid.spines['top'].set_visible(False)
+        ax_resid.spines['right'].set_visible(False)
+
+        if 'trend' in df_plot.columns:
+            set_line_plot(ax=ax_trend, df=df_plot, y='trend', x='ds', color=FORECAST_COLOR)
+            ax_trend.fill_between(df_plot['ds'], df_plot['trend_lower'], df_plot['trend_upper'], color=FORECAST_COLOR, alpha=0.1)
+            ax_trend.set_ylabel("Trend")
+            ax_trend.set_xlabel(None)
+            ax_trend.spines['top'].set_visible(False)
+            ax_trend.spines['right'].set_visible(False)
+
+        if 'yearly' in df_plot.columns:
+            month_order = ['January', 'February', 'March', 'April', 'May', 'June','July', 'August', 'September', 'October', 'November', 'December']
+            df_plot['month'] = pd.Categorical(df_plot['month'], categories=month_order, ordered=True)
+            df_plot = df_plot.sort_values('month')
+            df_unique_months = df_plot[['month', 'yearly']].drop_duplicates(subset='month')
+            sns.lineplot(ax=ax_yearly, data=df_unique_months, x='month', y='yearly', color=FORECAST_COLOR, marker='o')
+            #sns.scatterplot(ax=ax_yearly, data=df_plot, x='month', y='month_norm_value', color=FORECAST_COLOR, alpha=0.3, s=10)
+            ax_yearly.set_ylabel("Yearly")
+            ax_yearly.set_xlabel(None)
+            ax_yearly.spines['top'].set_visible(False)
+            ax_yearly.spines['right'].set_visible(False)
+
+        if 'weekly' in df_plot.columns:
+            day_order = ['Sunday','Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            df_plot['day'] = pd.Categorical(df_plot['day'], categories=day_order, ordered=True)
+            df_plot = df_plot.sort_values('day')
+            df_unique_days = df_plot[['day', 'weekly']].drop_duplicates(subset='day')
+            #set_line_plot(ax=ax_weekly, df=df_unique_days, y='weekly', x='day', color=FORECAST_COLOR,max_x_labels=len(day_order))
+            sns.lineplot(ax=ax_weekly, data=df_unique_days, x='day', y='weekly', color=FORECAST_COLOR, marker='o')
+            #set_strip_plot(ax=ax_weekly, df=df_plot, y='day_norm_value', by='day', orient='v', color=FORECAST_COLOR, opacity=0.3)
+            #set_box_plot(ax=ax_weekly, df=df_plot, y='yhat', by='day', orient='v', overall_mean=False, category_mean=True, std_lines=False, confidence_lines=False)
+            ax_weekly.set_ylabel("Weekly")
+            ax_weekly.set_xlabel(None)
+            ax_weekly.spines['top'].set_visible(False)
+            ax_weekly.spines['right'].set_visible(False)
+            
+        plt.tight_layout()    
     
+
+    return {
+        'output':{'log':log,'plot':fig,'table':table},
+        'output_type':'analysis',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=10)],
+                'default':None
+            },
+            'x':{
+                'type':'category',
+                'options':[f"'{item}'" for item in df.select_dtypes(include=['datetime', 'datetimetz']).columns.tolist() + df.select_dtypes(include='object').columns.tolist()],
+                'default':'index'
+            },
+            'training_size':{
+                'type':'float',
+                'options':[0.9,0.8,0.7,0.6,0.5],
+                'default':0.8
+            },
+            'yearly_seasonality':{
+                'type':'category',
+                'options':["'False'","'True'"],
+                'default':"'False'"
+            },
+            'weekly_seasonality':{
+                'type':'category',
+                'options':["'False'","'True'"],
+                'default':"'False'"
+            },
+            'changepoint_prior_scale':{
+                'type':'float',
+                'options':[0.01,0.05,0.1,0.2],
+                'default':0.05
+            },
+            'seasonality_prior_scale':{
+                'type':'float',
+                'options':[1.0,0.5,10.0],
+                'default':10.0
+            },
+            'seasonality_mode':{
+                'type':'category',
+                'options':["'additive'","'multiplicative'"],
+                'default':"'additive'"
+            }
+        }
+    }
+def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,sample_size:int=20,training_size:float=0.7,target=None):
+    def set_log(dt,y,x,sample_size=sample_size):
+        return textwrap.dedent(f"""\
+        Process Control Analysis:
+        ----------------------------
+        file = '{dt._file_name}'
+        y  = '{y}' 
+        x  = '{x}' 
+
+        Training Size = {training_size} (= Early {int(training_size*100)}% of data for calculating control limits)
+        sample size = {sample_size}
+        Target = {target if target not in [None,'none','None'] else 'Training Data Mean'}
+        """)
+    def set_axis_style(ax,y_label:str):
+        ax.set_ylabel(y_label , fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
+        ax.tick_params(axis='x',labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # x-axis tick numbers
+        ax.tick_params(axis='y', labelsize=11,labelcolor=CONFIG['Chart']['font_color'])  # y-axis tick numbers
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+    def set_x_plot(ax,df:pd.DataFrame,y:str,x:str,sample_size:int=20,training_size:float=0.7,target=None):
+        MAX_LABELS = 7
+        POINT_SIZE = 8 if len(df) > 1000 else 11 if len(df) > 200 else 15
+        set_line_plot(ax=ax,df=df[df.set=='train'],y=y,x=x,color=None,opacity=0.3,max_x_labels=MAX_LABELS)
+        set_line_plot(ax=ax,df=df[df.set=='test'],y=y,x=x,color=None,opacity=0.5,max_x_labels=MAX_LABELS)
+        set_line_plot(ax=ax,df=df,y=f"{y}_mean",x=x,color='blue',opacity=1,max_x_labels=MAX_LABELS)
+        ax.scatter(df.loc[df.ooc==True,x],df.loc[df.ooc==True,y], facecolors='white',edgecolors='red',s=POINT_SIZE,label='Out of Control')
+        if len(df[f"{y}_mean"].unique()) < 100:
+            set_scatter_plot(ax=ax,df=df,y=f"{y}_mean",x=x,color=None,opacity=1)
+
+        train_data = df.loc[:int(len(df)*training_size),y]
+        mean, std = train_data.mean(), train_data.std()
+        y_target = target if target not in [None,'none','None'] else mean
+        ucl, lcl = y_target + 3*std, y_target - 3*std 
+
+        ax.hlines(y=y_target, xmin=min(df[x]), xmax=max(df[x]), colors='green', linestyles='--', label='Training Data Mean'if target == None else 'Target', linewidth=1)
+        ax.hlines(y=ucl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='UCL (3σ)', linewidth=1)
+        ax.hlines(y=lcl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='LCL (3σ)', linewidth=1)
+        ax.set_title('X Chart', fontsize=13, color=CONFIG['Chart']['font_color'], pad=10)
+        set_axis_style(ax=ax,y_label=f"{y} Mean")
+    def set_r_plot(ax,df:pd.DataFrame,y:str,x:str,sample_size:int=20,training_size:float=0.7):
+        MAX_LABELS = 7
+        spread_stat = 'std' if sample_size > 14 else 'range'
+        set_line_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,color='blue',opacity=1,max_x_labels=MAX_LABELS)
+
+        if len(df[f"{y}_{spread_stat}"].unique()) < 100:
+            set_scatter_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,by=None,color='blue',opacity=1)    
+        
+        train_data = df.loc[:int(len(df)*training_size),f"{y}_{spread_stat}"]
+        mean, std, rang = train_data.mean(), train_data.std(), train_data.max() - train_data.min()
+        ucl = mean + 3*(std if spread_stat=='std' else rang)  # d4 for n=2 is 3.267, for n=3 is 2.574, for n=4 is 2.282, for n=5 is 2.114, for n=6 is 2.004, for n=7 is 1.924, for n=8 is 1.864, for n=9 is 1.816, for n=10 is 1.777
+        ax.hlines(y=mean, xmin=min(df[x]), xmax=max(df[x]), colors='green', linestyles='--', label='Target', linewidth=1)
+        ax.hlines(y=ucl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='UCL', linewidth=1)
+        ax.set_title('R Chart', fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'], pad=10)
+        set_axis_style(ax=ax,y_label=f"{y}  {'Std Dev' if spread_stat == 'std' else 'Range'}")
+
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
+    df = dt._sub_frames[df] 
+    MAX_LABELS = 7 
+    fig, ax = plt.subplots(2,1,figsize=(13,8), dpi=80, sharex=True)
+    #fig.suptitle('Process Control Analysis', fontsize=16, fontfamily='Consolas', color=CONFIG['Chart']['font_color'],y=1.02)
+
+    table = pd.DataFrame(columns=['rmse','mape'])
+    log = set_log(dt=dt, y=y, x=x, sample_size=sample_size)
+
+    if y not in [None,'none','None'] and x not in [None,'none','None']:
+        data = df[[y,x]].sort_values(x).reset_index(drop=True).copy()
+        train_data = data.loc[:int(len(data)*training_size),y]
+        data['set'] = 'test'
+        data.loc[:int(len(data)*training_size),'set'] = 'train'
+        mean, std = train_data.mean(), train_data.std()
+        ucl, lcl = mean + 3*std, mean - 3*std 
+        data[f"{y}_mean"] = data[y].rolling(window=sample_size).mean()
+        data[f"{y}_std"] = data[y].rolling(window=sample_size).std()
+        data[f"{y}_max"] = data[y].rolling(window=sample_size).max()
+        data[f"{y}_min"] = data[y].rolling(window=sample_size).min()
+        data[f"{y}_range"] = data[f"{y}_max"] - data[f"{y}_min"]
+        data['ooc'] = (data[y] > ucl) | (data[y] < lcl)
+        table = data.tail(10) # monitor
+
+        set_x_plot(ax=ax[0],df=data,y=y,x=x,sample_size=sample_size,training_size=training_size,target=target) # x chart
+        set_r_plot(ax=ax[1],df=data,y=y,x=x,sample_size=sample_size,training_size=training_size) # r chart
+
+        
+    plt.tight_layout()
+    return {
+        'output':{'log':log,'plot':fig,'table':table},
+        'output_type':'analysis',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
+                'default':f"'df'"
+            },
+            'y':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_numeric_columns(df=df,min_uniques=10)],
+                'default':None
+            },
+            'x':{
+                'type':'category',
+                'options':[f"'{item}'" for item in get_time_columns(df=df)],
+                'default':'index'
+            },
+            'sample_size':{
+                'type':'integer',
+                'options':[5,10,20,30,50],
+                'default':20
+            },
+            'training_size':{
+                'type':'float',
+                'options':[0.9,0.8,0.7],
+                'default':0.7
+            }
+        }
+    }

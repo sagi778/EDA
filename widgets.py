@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import QStackedLayout,QVBoxLayout,QHBoxLayout,QFormLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame,QSizePolicy
-from PyQt5.QtWidgets import QTreeView, QFileSystemModel,QFileIconProvider,QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit,QListWidget,QListWidgetItem,QAbstractItemView
+from PyQt5.QtWidgets import (QStackedLayout,QVBoxLayout,QHBoxLayout,QFormLayout,QComboBox,QLineEdit,QApplication, QMainWindow,QWidget, QLabel,QPushButton,QFrame,QSizePolicy)
+from PyQt5.QtWidgets import (QMenu,QTreeView, QFileSystemModel,QFileIconProvider,QSplitter, QMessageBox,QTabWidget,QScrollArea,QTextEdit,QListWidget,QListWidgetItem,QAbstractItemView)
 
 from PyQt5.QtGui import QColor,QIcon,QPixmap, QTextCursor,QIntValidator,QDoubleValidator,QStandardItemModel,QStandardItem,QPainter
-from PyQt5.QtCore import QDir,Qt,QModelIndex,QSize,QFileInfo,QPropertyAnimation,QObject,pyqtSignal,QThread,QEvent
+from PyQt5.QtCore import QPoint,QDir,Qt,QModelIndex,QSize,QFileInfo,QPropertyAnimation,QObject,pyqtSignal,QThread,QEvent
 import sys
 import traceback
 from func import *
@@ -40,7 +40,7 @@ class CodeLine(QWidget):
                 background-color: {CONFIG["Controls"]["hover-color"]};
                 border-color: {CONFIG["Controls"]["hover-color"]}
             }}
-        """
+            """
         self.play = QPushButton('', self)
         self.play.setIcon(QIcon(f'{CURRENT_PATH}/icons/play.png'))
         self.play.setStyleSheet(BUTTON_STYLE)
@@ -67,7 +67,7 @@ class CodeLine(QWidget):
                 background-color: {CONFIG['CodeLine']['focus']['background-color']};
                 border: 1px solid {CONFIG['CodeLine']['focus']['border-color']};
             }} 
-        ''')
+            ''')
 
         self.line.returnPressed.connect(self.run_command)
 
@@ -292,7 +292,7 @@ class ArgsMenu(QWidget):
 
         dt_label = QLabel('data table = ')
         dt_label.setStyleSheet(LABEL_STYLE)
-        dt_arg_label = QLabel(f'{DATA_TABLE["table"]._file_name}')
+        dt_arg_label = QLabel(f"{DATA_TABLE['tables'][DATA_TABLE['current_table_index']]._file_name}")
         dt_arg_label.setStyleSheet(LABEL_STYLE)
         self.form_layout.addRow(dt_label, dt_arg_label)
 
@@ -319,8 +319,10 @@ class ArgsMenu(QWidget):
                     "QComboBox::drop-down {"
                         "border: none;" 
                     "}"
-                )
+                    )
                 combo.addItems(arg['options'])
+                #print(f"arg_name = {arg_name}, chosen = {self.get_parameter_value(arg_name)} all options = {arg['options']}") # monitor
+                combo.setCurrentText(f"'{str(self.get_parameter_value(arg_name))}'")  # Set default text
                 combo.setFixedWidth(min(MAX_ARG_WIDTH,20 + max([12*len(str(item)) for item in arg['options']])))
                 combo.currentIndexChanged.connect(self.update_command)
                 self.form_layout.addRow(arg_label,combo)
@@ -330,16 +332,16 @@ class ArgsMenu(QWidget):
                 int_arg.setText(str(self.get_parameter_value(arg_name)))  # Set default text
                 int_arg.setFixedWidth(min(MAX_ARG_WIDTH,max([12*len(str(item)) for item in arg['options']])))
                 int_arg.setStyleSheet(
-                                        "QLineEdit { "
-                                        f"font: {CONFIG['arguments']['font']}; "
-                                        "color: green;"
-                                        "padding: 1px 1px; "
-                                        "border: 1px solid #dedede; "
-                                        "border-radius: 5px; "
-                                        f"background-color: #f0faf7; "
-                                        "selection-background-color: #eafaf1; "
-                                        "}"
-                                    )
+                    "QLineEdit { "
+                    f"font: {CONFIG['arguments']['font']}; "
+                    "color: green;"
+                    "padding: 1px 1px; "
+                    "border: 1px solid #dedede; "
+                    "border-radius: 5px; "
+                    f"background-color: #f0faf7; "
+                    "selection-background-color: #eafaf1; "
+                    "}"
+                    )
                 int_arg.textChanged.connect(self.update_command)                    
                 self.form_layout.addRow(arg_label,int_arg)    
             elif arg['type'] == 'text':
@@ -391,14 +393,18 @@ class ArgsMenu(QWidget):
                     }}
 
                     """
-                )
+                    )
                 self.item_list.setFlow(QListWidget.LeftToRight)
                 self.item_list.setWrapping(True)  # Allow wrapping if width is exceeded
 
+                checked_items = self.get_parameter_value(arg_name)
                 for text_item in arg['options']:
                     item = QListWidgetItem(text_item)
                     item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                    item.setCheckState(Qt.Unchecked)
+                    if text_item in checked_items:
+                        item.setCheckState(Qt.Checked)
+                    else:
+                        item.setCheckState(Qt.Unchecked)
                     self.item_list.addItem(item)
 
                 self.item_list.itemChanged.connect(self.update_command)
@@ -406,31 +412,26 @@ class ArgsMenu(QWidget):
 
         self.setLayout(self.form_layout)
 
-    def get_parameter_value(self, arg_name: str):
-        def get_next_end_indexes(string: str):
-            quat_open_flag = False
-            end_indexes = []
-            for i in range(len(string)):
-                if string[i] in ['[','"', "'"]:
-                    quat_open_flag = not quat_open_flag
-                elif string[i] in [']',',', ')'] and not quat_open_flag:
-                    end_indexes.append(i)
-            return end_indexes
-
+    def get_parameter_value(self,arg_name: str):
+        """
+        Extracts the value of a parameter from a Python-like function call string.
+        Returns the value as a Python object when possible, else as raw string.
+        """
+        # Regex: match arg_name=value (value can be quoted, bracketed, or bare)
         cmd_string = self._cmd_block._cmd
-        current_arg_string = cmd_string[cmd_string.find(arg_name) + len(arg_name):]
-        #print(f"current_arg_string = {current_arg_string}")
+        pattern = rf"{arg_name}\s*=\s*(\[.*?\]|\(.*?\)|\{{.*?\}}|'.*?'|\".*?\"|[^,)\s]+)"
+        match = re.search(pattern, cmd_string)
+        if not match:
+            return None  # arg not found
+
+        raw_value = match.group(1).strip()
 
         try:
-            start = current_arg_string.find('=') + 1
-            end_indexes = get_next_end_indexes(current_arg_string)
-            if not end_indexes:
-                return current_arg_string[start:].strip(" )")
-            print(f"parameter_value = {current_arg_string[start:end_indexes[0]]}") # monitor
-            return current_arg_string[start:end_indexes[0]].strip()
-        except Exception as e:
-            print(f"Error parsing parameter '{arg_name}': {e}")
-            return None
+            # Safely convert to Python literal (str, int, float, bool, list, dict, tuple, None)
+            return ast.literal_eval(raw_value)
+        except Exception:
+            # If not evaluable (e.g., variable name), return raw string
+            return raw_value    
     def set_sql(self):
         # print(self.sql_arg.toPlainText()) # monitor
         query_string = '"' + self.sql_arg.toPlainText().replace('\n',' ').replace('"', "'") + '"'
@@ -453,32 +454,39 @@ class ArgsMenu(QWidget):
                     new_cmd += char        
 
                 return ''.join(new_cmd)
-            def get_new_parameters(args:ArgsMenu): 
+            def get_new_parameters(args:ArgsMenu):
+                """Get widget values, safely serialized for command injection."""
                 param = []
-                for item in args.children():
-                    #print(item)
-                    if isinstance(item, QComboBox):
-                        #print(f'QComboBox = {item.currentText()}')
-                        param.append(item.currentText())
-                    elif isinstance(item, QLineEdit):
-                        #print(f'QLineEdit = {item.text()}')   
-                        param.append(item.text()) 
-                    elif isinstance(item, QTextEdit):
-                        #print(f'QTextEdit = {item.toPlainText()}')   
-                        param.append(item.toPlainText())     
-                    elif isinstance(item, QListWidget):
-                        selected_items = []
-                        selected_items = [item.item(i).text() for i in range(item.count()) if item.item(i).checkState() == Qt.Checked]
-                        param.append(selected_items)    
+                for widget in args.children():
+                    if isinstance(widget, QComboBox):
+                        val = widget.currentText()
+                    elif isinstance(widget, QLineEdit):
+                        val = widget.text()
+                    elif isinstance(widget, QTextEdit):
+                        val = widget.toPlainText()
+                    elif isinstance(widget, QListWidget):
+                        val = [widget.item(i).text() for i in range(widget.count()) if widget.item(i).checkState() == Qt.Checked]
+                    else:
+                        continue
 
-                return param 
+                    # Serialize lists, tuples, dicts, numbers, bools, None
+                    if isinstance(val, (list, tuple, dict)):
+                        param.append(repr(val))
+                    else:
+                        # Keep normal strings as-is (no extra quotes)
+                        param.append(val if val != '' else None)
 
+                return param
+            
             cmd_string = delete_func_parameters(cmd)
-            for item in get_new_parameters(args):
-                cmd_string = cmd_string.replace('=',f"@{item}",1)
-                #print(cmd_string)
+            values = get_new_parameters(args)
 
-            return cmd_string.replace('@','=')   
+            for val in values:
+                if val is None:
+                    continue  # skip empty values
+                cmd_string = cmd_string.replace('=', f"@{val}", 1)
+
+            return cmd_string.replace('@', '=')  
 
         #print('update command') # monitor
         # set code line
@@ -554,7 +562,7 @@ class Comment(QWidget):
 
 # advanced widgets
 class CommandBlock(QWidget):
-    def __init__(self,dt:DataTable=DATA_TABLE['table'],cmd:str=''):
+    def __init__(self,dt:DataTable=pd.DataFrame(),cmd:str=''):
         super().__init__()
         self.setObjectName("CommandBlock")
         
@@ -575,7 +583,7 @@ class CommandBlock(QWidget):
                 border: 1px solid #dedede;
                 border-radius: 15px;
             }}
-        """)
+            """)
         self.set_block_size(w=1200,h=120)
         
         # Create layout
@@ -664,6 +672,7 @@ class DataViewer(QWidget):
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{ 
                 border: none; 
+                top: -1px;
                 border-radius: 15px;
             }}
             QTabBar::tab {{ 
@@ -672,19 +681,27 @@ class DataViewer(QWidget):
                 font: 13px Consolas;
                 color: {CONFIG['DataViewer']['unselected-tab-color']};
                 border: {CONFIG['DataViewer']['border']};
-                border-radius: 10px; 
+                border-radius: 0px; 
                 margin: 1px; 
             }}
             QTabBar::tab:selected {{ 
-                background: {CONFIG['DataViewer']['selected-tab-color']}; 
-                font: 14px Consolas;
-                border-color: {get_darker_color(CONFIG['DataViewer']['selected-tab-color'],30)};
+                font: 13px Consolas;
+                border-width: 2px;
+                border-left: 0px;
+                border-top: 0px;
+                border-right: 0px;
+                border-color: {CONFIG['CodeLine']['focus']['border-color']};
                 color: {CONFIG['FileExplorer']['color']}; 
                 font-weight: bold; 
+        
             }}
             QTabBar::tab:hover {{
                 color: {CONFIG['FileExplorer']['color']}; 
-                border-width: 2px;
+                border-width: 1px;
+                border-left: 0px;
+                border-top: 0px;
+                border-right: 0px;
+                border-color: {CONFIG['DataViewer']['border']};
                 background-color: {CONFIG['DataViewer']['hover-color']};
             }}
             QScrollArea {{
@@ -709,7 +726,7 @@ class DataViewer(QWidget):
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 background: none; /* Hide arrows */
             }}
-        """)
+            """)
         DATA_COMBO_STYLE = f"""
                 QComboBox {{
                     font: {CONFIG['arguments']['font']};
@@ -727,7 +744,7 @@ class DataViewer(QWidget):
                 QComboBox::drop-down {{
                     border: none;
                 }}
-        """
+            """
         self.tabs.setIconSize(QSize(45,45))  # Set tab icon size
         self.tabs.setFixedWidth(1300)
         
@@ -799,6 +816,23 @@ class DataViewer(QWidget):
         self.analysis_stack.setLayout(self.analysis_stack_layout)
         self.analysis_main_layout.addWidget(self.analysis_stack)
 
+        # Analysis
+        self.time_main = QWidget()
+        self.time_main_layout = QVBoxLayout()
+        self.time_main_layout.setAlignment(Qt.AlignTop)
+        self.time_main_layout.setSpacing(1)
+        self.time_main.setLayout(self.time_main_layout)
+        self.tabs.addTab(self.time_main, QIcon(f'{CURRENT_PATH}/icons/time.png'), "Time")
+        self.time_comb = QComboBox()
+        #self.analysis_comb.setFixedWidth(500)
+        self.time_comb.setStyleSheet(DATA_COMBO_STYLE)
+        self.time_comb.currentIndexChanged.connect(self.switch_time_layout)
+        self.time_main_layout.addWidget(self.time_comb)
+        self.time_stack = QWidget()
+        self.time_stack_layout = QStackedLayout()
+        self.time_stack.setLayout(self.time_stack_layout)
+        self.time_main_layout.addWidget(self.time_stack)
+
         # Story
         self.story_tab = QWidget()
         self.story_scroll = QScrollArea()
@@ -823,10 +857,13 @@ class DataViewer(QWidget):
     def switch_plots_layout(self, index):
         self.plots_stack_layout.setCurrentIndex(index)   
     def switch_analysis_layout(self, index):
-        self.analysis_stack_layout.setCurrentIndex(index)       
+        self.analysis_stack_layout.setCurrentIndex(index)   
+    def switch_time_layout(self, index):
+        self.time_stack_layout.setCurrentIndex(index)         
     def set_preview(self):
         #print('[>] Setting up preview commands')
-        self.preview_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
+        current_table = DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
+        self.preview_comb.addItem(f"DataTable = {current_table._file_name}")
 
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
@@ -834,7 +871,7 @@ class DataViewer(QWidget):
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['Preview']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string, dt=DATA_TABLE['table']))
+            content_layout.addWidget(CommandBlock(cmd=cmd_string, dt=DATA_TABLE['tables'][DATA_TABLE['current_table_index']]))
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -842,14 +879,14 @@ class DataViewer(QWidget):
         self.preview_stack_layout.addWidget(scroll_area)
     def set_sql(self):
         #print('[>] Setting up SQL commands')
-        self.sql_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
+        self.sql_comb.addItem(f"DataTable = {DATA_TABLE['tables'][DATA_TABLE['current_table_index']]._file_name}")
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setAlignment(Qt.AlignTop)
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['SQL']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['table']))     
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['tables'][DATA_TABLE['current_table_index']]))     
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -857,14 +894,14 @@ class DataViewer(QWidget):
         self.sql_stack_layout.addWidget(scroll_area)       
     def set_plots(self):
         #print('[>] Setting up plots commands')
-        self.plots_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
+        self.plots_comb.addItem(f"DataTable = {DATA_TABLE['tables'][DATA_TABLE['current_table_index']]._file_name}")
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setAlignment(Qt.AlignTop)
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['Plots']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['table']))     
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['tables'][DATA_TABLE['current_table_index']]))     
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -872,19 +909,34 @@ class DataViewer(QWidget):
         self.plots_stack_layout.addWidget(scroll_area)           
     def set_analysis(self):
         #print('[>] Setting up analysis commands')
-        self.analysis_comb.addItem(f"df = {DATA_TABLE['table']._file_name}")
+        self.analysis_comb.addItem(f"DataTable = {DATA_TABLE['tables'][DATA_TABLE['current_table_index']]._file_name}")
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setAlignment(Qt.AlignTop)
         content_layout.setSpacing(0)
 
         for cmd_string in COMMANDS['Analysis']:
-            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['table']))   
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['tables'][DATA_TABLE['current_table_index']]))   
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(content_widget)
         self.analysis_stack_layout.addWidget(scroll_area)            
+    def set_time(self):
+        #print('[>] Setting up analysis commands')
+        self.time_comb.addItem(f"DataTable = {DATA_TABLE['tables'][DATA_TABLE['current_table_index']]._file_name}")
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setSpacing(0)
+
+        for cmd_string in COMMANDS['Time']:
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['tables'][DATA_TABLE['current_table_index']]))   
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(content_widget)
+        self.time_stack_layout.addWidget(scroll_area) 
 
 # file explorer
 class FileExplorer(QWidget):
@@ -893,7 +945,7 @@ class FileExplorer(QWidget):
 
         self._selected_file = None
         self._file_tree = file_tree
-        print(f'file_tree = {file_tree}') # monitor
+        #print(f'file_tree = {file_tree}') # monitor
 
         layout = QVBoxLayout(self)
 
@@ -914,7 +966,7 @@ class FileExplorer(QWidget):
                 background-color: {CONFIG['CodeLine']['focus']['background-color']};
                 border-color: {CONFIG['CodeLine']['focus']['border-color']};
             }} 
-        ''')
+            ''')
         layout.addWidget(self.path)
         #self.line.returnPressed.connect(self.run_command)
         
@@ -935,7 +987,7 @@ class FileExplorer(QWidget):
                 background-color: {CONFIG['CodeLine']['focus']['background-color']};
                 border-color: {CONFIG['CodeLine']['focus']['border-color']};
             }} 
-        ''')
+            ''')
         layout.addWidget(self.filename)
 
         self.model = QFileSystemModel()
@@ -1011,7 +1063,7 @@ class FileExplorer(QWidget):
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
                 background: none; /* Hide arrows */
             }}
-        """)
+            """)
 
         layout.addWidget(self.treeView)
 
@@ -1022,6 +1074,7 @@ class FileExplorer(QWidget):
             data_viewer.set_sql()
             data_viewer.set_analysis()
             data_viewer.set_plots()
+            data_viewer.set_time()
 
         self._selected_file = self.model.filePath(index) 
         self.path.setText(self._selected_file)
@@ -1029,20 +1082,46 @@ class FileExplorer(QWidget):
 
         file_type = self._selected_file.split('.')[-1] 
         if file_type in ['csv','xlsx']:
-            DATA_TABLE['table'] = DataTable(file_tree=DATA_TABLE['file_tree'],path=self._selected_file)
-            #print(f"new table created: {DATA_TABLE['table'].get_status()}") # monitor
-            self.filename.setText(f"df = {DATA_TABLE['table']._file_name}")
-            self._file_tree.add_subfile(parent_file=DATA_TABLE['table']._file_name,df_name='df')
+            new_table = DataTable(file_tree=DATA_TABLE['file_tree'],path=self._selected_file)
+            DATA_TABLE['tables'].append(new_table)
+            table_index = len(DATA_TABLE['tables']) - 1
+            DATA_TABLE['current_table_index'] = table_index
+            print(f'[+] Load DataTable: {new_table}') # monitor
+            self.filename.setText(f"DataTable = {new_table._file_name}")
+            self._file_tree.add_subfile(parent_file=new_table._file_name,df_name='df')
             load_file_to_data_viewer(self)
 class FileTree(QWidget):
     def __init__(self):
         super().__init__()   
         self.setObjectName("FileTree")         
-       
+
+        self._data_item = None       
         layout = QVBoxLayout(self)
         
+        self.filename = QLineEdit(self)
+        self.filename.setStyleSheet(f'''
+            QLineEdit {{
+                font:{CONFIG['FileExplorer']['font']};
+                color:{CONFIG['FileExplorer']['color']};
+                background-color:{CONFIG['CodeLine']['background-color']};
+                border:{CONFIG['CodeLine']['border']};
+                border-radius:{CONFIG['CodeLine']['border-radius']};
+                width: 100px;
+                height: 20px;
+            }}   
+
+            QLineEdit:focus {{
+                color: {CONFIG['CodeLine']['focus']['color']};
+                background-color: {CONFIG['CodeLine']['focus']['background-color']};
+                border-color: {CONFIG['CodeLine']['focus']['border-color']};
+            }} 
+            ''')
+        layout.addWidget(self.filename)
+
         # TreeView and Model
         self.tree = QTreeView()
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.get_file_menu)
         self.model = QStandardItemModel()
         self.tree.setHeaderHidden(True)
         self.root_node = self.model.invisibleRootItem()
@@ -1111,7 +1190,33 @@ class FileTree(QWidget):
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
                 background: none; /* Hide arrows */
             }}
-        """)
+            """)
+
+    def get_file_menu(self, pos: QPoint):
+        index = self.tree.indexAt(pos)
+        if not index.isValid():  # No item clicked
+            return
+
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+                    QMenu {{background-color: #ffffff; border: 2px solid #ccc;}} 
+                    QMenu::item {{padding: 4px 20px;}}
+                    QMenu::item:selected {{background-color: #0078d7; color: white;}} 
+                    QMenu::separator {{height: 1px; background: #ccc; margin: 5px 1;}}
+                    """)
+        load = menu.addAction("Load DataTable")
+        unload = menu.addAction("Unload DataTable")
+        
+        action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
+        if action == load:
+            self.filename.setText(f"[+] {index.data()}")
+            data_viewer = self.parent().parent().parent().findChild(DataViewer,None,Qt.FindChildrenRecursively) # find data_viewer
+            data_viewer.set_preview()
+            data_viewer.set_sql()
+            data_viewer.set_analysis()
+            data_viewer.set_plots()
+        elif action == unload:
+            self.filename.setText(f"[-] {index.data()}")
 
     def add_file(self,file_name:str, file_path:str):
         item = QStandardItem(file_name)
@@ -1127,43 +1232,6 @@ class FileTree(QWidget):
         parent_item.appendRow(new_item)
 
 # output widgets
-class PlotOutput(QWidget):
-    def __init__(self, fig=None, parent=None, height:int=400, width:int=400):
-        super().__init__(parent)
-
-        self._height = height 
-        self._width = width
-        LABEL_STYLE = f"""
-            QLabel {{
-                font: {CONFIG['Table']['font']};
-                color: {CONFIG['Table']['color']};
-                background-color: white; 
-                white-space: pre;
-                padding: 20px 20px; 
-                border-radius: {CONFIG["Controls"]["border-radius"]};
-                border: 0px solid white;
-            }}
-            QLabel:hover {{
-                color: {CONFIG['FileExplorer']['color']};
-            }}
-        """
-
-        self.setStyleSheet("background-color: white; border: 2px solid #333;")
-        #self.setFixedSize(self._height,self._width)
-        
-        self.layout = QVBoxLayout()
-
-        #self.log = QLabel(text=f"df = {DATA_TABLE['file_name']}\n")
-        #self.log.setStyleSheet(LABEL_STYLE) 
-        #self.layout.addWidget(self.log)
-
-        self.canvas = FigureCanvas(fig if fig else plt.figure(figsize=(self._width,self._height)))
-        self.layout.addWidget(self.canvas)
-        self.setLayout(self.layout)
-
-    def set_plot(self, fig):
-        self.canvas.figure = fig
-        self.canvas.draw()
 class PlotOutput(QWidget):
     def __init__(self, fig=None, parent=None):
         super().__init__(parent)
