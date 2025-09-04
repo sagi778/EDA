@@ -1252,7 +1252,7 @@ class PlotOutput(QWidget):
         self.canvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         w, h = self.canvas.figure.get_size_inches() * self.canvas.figure.dpi
         self.canvas.setMinimumSize(int(w), int(h))
-        self.canvas.figure.axes[0].set_title(f"figure size: (w={w},h={h})")
+        #self.canvas.figure.axes[0].set_title(f"figure size: (w={w},h={h})")
 
     def set_plot(self, fig):
         self.canvas.setParent(None)

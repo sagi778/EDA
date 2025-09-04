@@ -2258,7 +2258,7 @@ def get_timeseries_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,
             }
         }
     }
-def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,sample_size:int=20,training_size:float=0.7,target=None):
+def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=None,sample_size:int=20,training_size:float=0.7,target=None,sensitivity:float=0.1):
     def set_log(dt,y,x,sample_size=sample_size):
         return textwrap.dedent(f"""\
         Process Control Analysis:
@@ -2267,9 +2267,11 @@ def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=Non
         y  = '{y}' 
         x  = '{x}' 
 
-        Training Size = {training_size} (= Early {int(training_size*100)}% of data for calculating control limits)
+        Training = {training_size:.2f} (= Early {int(training_size*100)}% of data for calculating control limits)
+        Test = {1-training_size:.2f} (= Latest {int((1-training_size)*100)}% of data)
         sample size = {sample_size}
         Target = {target if target not in [None,'none','None'] else 'Training Data Mean'}
+        Sensitivity = {sensitivity} (= Drift detection sensitivity)
         """)
     def set_axis_style(ax,y_label:str):
         ax.set_ylabel(y_label , fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])
@@ -2280,38 +2282,42 @@ def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=Non
     def set_x_plot(ax,df:pd.DataFrame,y:str,x:str,sample_size:int=20,training_size:float=0.7,target=None):
         MAX_LABELS = 7
         POINT_SIZE = 8 if len(df) > 1000 else 11 if len(df) > 200 else 15
-        set_line_plot(ax=ax,df=df[df.set=='train'],y=y,x=x,color=None,opacity=0.3,max_x_labels=MAX_LABELS)
-        set_line_plot(ax=ax,df=df[df.set=='test'],y=y,x=x,color=None,opacity=0.5,max_x_labels=MAX_LABELS)
-        set_line_plot(ax=ax,df=df,y=f"{y}_mean",x=x,color='blue',opacity=1,max_x_labels=MAX_LABELS)
-        ax.scatter(df.loc[df.ooc==True,x],df.loc[df.ooc==True,y], facecolors='white',edgecolors='red',s=POINT_SIZE,label='Out of Control')
-        if len(df[f"{y}_mean"].unique()) < 100:
-            set_scatter_plot(ax=ax,df=df,y=f"{y}_mean",x=x,color=None,opacity=1)
-
-        train_data = df.loc[:int(len(df)*training_size),y]
-        mean, std = train_data.mean(), train_data.std()
+        
+        train_data = df.iloc[:int(len(df)*training_size)]
+        test_data = df.iloc[int(len(df)*training_size):]
+        mean, std = train_data[y].mean(), train_data[y].std()
         y_target = target if target not in [None,'none','None'] else mean
         ucl, lcl = y_target + 3*std, y_target - 3*std 
+
+        set_line_plot(ax=ax,df=df,y=f"{y}_mean",x=x,color=get_darker_color(CONFIG['Chart']['data_colors'][0],40),opacity=1,max_x_labels=MAX_LABELS)
+        ax.plot(train_data[x],train_data[y], color=CONFIG['Chart']['data_colors'][0], alpha=0.3, linewidth=1, label='Train Data')
+        ax.plot(test_data[x],test_data[y], color=CONFIG['Chart']['data_colors'][0], alpha=0.5, linewidth=1, label='Test Data')
+        ax.scatter(df.loc[df.ooc==True,x],df.loc[df.ooc==True,y], facecolors='white',edgecolors='red',s=POINT_SIZE,label='Out of Control')
+        #ax.set_title('X̄ Chart', fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'], pad=10)
+        if len(df[f"{y}_mean"].unique()) < 100:
+            set_scatter_plot(ax=ax,df=df,y=f"{y}_mean",x=x,color=None,opacity=1)
 
         ax.hlines(y=y_target, xmin=min(df[x]), xmax=max(df[x]), colors='green', linestyles='--', label='Training Data Mean'if target == None else 'Target', linewidth=1)
         ax.hlines(y=ucl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='UCL (3σ)', linewidth=1)
         ax.hlines(y=lcl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='LCL (3σ)', linewidth=1)
-        ax.set_title('X Chart', fontsize=13, color=CONFIG['Chart']['font_color'], pad=10)
         set_axis_style(ax=ax,y_label=f"{y} Mean")
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
     def set_r_plot(ax,df:pd.DataFrame,y:str,x:str,sample_size:int=20,training_size:float=0.7):
         MAX_LABELS = 7
         spread_stat = 'std' if sample_size > 14 else 'range'
-        set_line_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,color='blue',opacity=1,max_x_labels=MAX_LABELS)
+        set_line_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,color=get_darker_color(CONFIG['Chart']['data_colors'][0],40),opacity=1,max_x_labels=MAX_LABELS)
 
         if len(df[f"{y}_{spread_stat}"].unique()) < 100:
-            set_scatter_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,by=None,color='blue',opacity=1)    
+            set_scatter_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,by=None,color=get_darker_color(CONFIG['Chart']['data_colors'][0],40),opacity=1)    
         
         train_data = df.loc[:int(len(df)*training_size),f"{y}_{spread_stat}"]
         mean, std, rang = train_data.mean(), train_data.std(), train_data.max() - train_data.min()
         ucl = mean + 3*(std if spread_stat=='std' else rang)  # d4 for n=2 is 3.267, for n=3 is 2.574, for n=4 is 2.282, for n=5 is 2.114, for n=6 is 2.004, for n=7 is 1.924, for n=8 is 1.864, for n=9 is 1.816, for n=10 is 1.777
         ax.hlines(y=mean, xmin=min(df[x]), xmax=max(df[x]), colors='green', linestyles='--', label='Target', linewidth=1)
         ax.hlines(y=ucl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='UCL', linewidth=1)
-        ax.set_title('R Chart', fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'], pad=10)
         set_axis_style(ax=ax,y_label=f"{y}  {'Std Dev' if spread_stat == 'std' else 'Range'}")
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+        #ax.set_title('R Chart', fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'], pad=10)
 
     dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
     df = dt._sub_frames[df] 
@@ -2319,7 +2325,7 @@ def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=Non
     fig, ax = plt.subplots(2,1,figsize=(13,8), dpi=80, sharex=True)
     #fig.suptitle('Process Control Analysis', fontsize=16, fontfamily='Consolas', color=CONFIG['Chart']['font_color'],y=1.02)
 
-    table = pd.DataFrame(columns=['rmse','mape'])
+    table = pd.DataFrame(columns=['time','target','mean','std', 'ooc_count', 'ooc%','drifted','stable'],index=['train','test']) 
     log = set_log(dt=dt, y=y, x=x, sample_size=sample_size)
 
     if y not in [None,'none','None'] and x not in [None,'none','None']:
@@ -2335,10 +2341,20 @@ def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=Non
         data[f"{y}_min"] = data[y].rolling(window=sample_size).min()
         data[f"{y}_range"] = data[f"{y}_max"] - data[f"{y}_min"]
         data['ooc'] = (data[y] > ucl) | (data[y] < lcl)
-        table = data.tail(10) # monitor
 
         set_x_plot(ax=ax[0],df=data,y=y,x=x,sample_size=sample_size,training_size=training_size,target=target) # x chart
         set_r_plot(ax=ax[1],df=data,y=y,x=x,sample_size=sample_size,training_size=training_size) # r chart
+
+        # summary table
+        target = target if target not in [None,'none','None'] else mean
+        test,train = data[data.set=='test'],data[data.set=='train']
+        table.loc['test','time'] = f"{test[y].mean():.4f}"
+        table.loc['test','mean'] = f"{test[y].mean():.4f}"
+        table.loc['test','std'] = f"{test[y].std():.4f}"
+        table.loc['test','ooc_count'] = f"{len(test[test.ooc==True])}"
+        table.loc['test','ooc%'] = f"{len(test[test.ooc==True])*100/len(test):.2f}"
+        table.loc['test','drifted'] = f"{(test[y].mean() - target) > (1 + sensitivity)*test[y].std()}"
+        table.loc['test','stable'] = f"{test[y].std() < (1 + sensitivity)*train[y].std()}"
 
         
     plt.tight_layout()
