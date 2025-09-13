@@ -2348,15 +2348,19 @@ def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=Non
         # summary table
         target = target if target not in [None,'none','None'] else mean
         test,train = data[data.set=='test'],data[data.set=='train']
-        table.loc['test','time'] = f"{test[y].mean():.4f}"
+        table.loc['test','time'] = f"{test[x].values[0]}"
         table.loc['test','mean'] = f"{test[y].mean():.4f}"
         table.loc['test','std'] = f"{test[y].std():.4f}"
         table.loc['test','ooc_count'] = f"{len(test[test.ooc==True])}"
         table.loc['test','ooc%'] = f"{len(test[test.ooc==True])*100/len(test):.2f}"
         table.loc['test','drifted'] = f"{(test[y].mean() - target) > (1 + sensitivity)*test[y].std()}"
         table.loc['test','stable'] = f"{test[y].std() < (1 + sensitivity)*train[y].std()}"
+        table.loc['train','time'] = f"{test[x].values[0]}"
+        table.loc['train','mean'] = f"{train[y].mean():.4f}"
+        table.loc['train','std'] = f"{train[y].std():.4f}"
+        table.loc['train','ooc_count'] = f"{len(train[train.ooc==True])}"
+        table.loc['train','ooc%'] = f"{len(train[train.ooc==True])*100/len(train):.2f}"
 
-        
     plt.tight_layout()
     return {
         'output':{'log':log,'plot':fig,'table':table},

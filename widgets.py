@@ -681,7 +681,7 @@ class DataViewer(QWidget):
                 font: 13px Consolas;
                 color: {CONFIG['DataViewer']['unselected-tab-color']};
                 border: {CONFIG['DataViewer']['border']};
-                border-radius: 0px; 
+                border-radius: 5px; 
                 margin: 1px; 
             }}
             QTabBar::tab:selected {{ 
@@ -697,7 +697,7 @@ class DataViewer(QWidget):
             }}
             QTabBar::tab:hover {{
                 color: {CONFIG['FileExplorer']['color']}; 
-                border-width: 1px;
+                border-width: 0px;
                 border-left: 0px;
                 border-top: 0px;
                 border-right: 0px;
