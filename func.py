@@ -2302,17 +2302,38 @@ def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=Non
         ax.hlines(y=lcl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='LCL (3σ)', linewidth=1)
         set_axis_style(ax=ax,y_label=f"{y} Mean")
         ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
-    def set_r_plot(ax,df:pd.DataFrame,y:str,x:str,sample_size:int=20,training_size:float=0.7):
+    def set_drift_chart(ax,df:pd.DataFrame,y:str,x:str,sample_size:int=20,training_size:float=0.7,sensitivity:float=0.1):
         MAX_LABELS = 7
-        spread_stat = 'std' if sample_size > 14 else 'range'
-        set_line_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,color=get_darker_color(CONFIG['Chart']['data_colors'][0],40),opacity=1,max_x_labels=MAX_LABELS)
+        POINT_SIZE = 8 if len(df) > 1000 else 11 if len(df) > 200 else 15
 
-        if len(df[f"{y}_{spread_stat}"].unique()) < 100:
-            set_scatter_plot(ax=ax,df=df,y=f"{y}_{spread_stat}",x=x,by=None,color=get_darker_color(CONFIG['Chart']['data_colors'][0],40),opacity=1)    
-        
-        train_data = df.loc[:int(len(df)*training_size),f"{y}_{spread_stat}"]
-        mean, std, rang = train_data.mean(), train_data.std(), train_data.max() - train_data.min()
+        train_data = df.iloc[:int(len(df)*training_size)]
+        test_data = df.iloc[int(len(df)*training_size):]
+        mean = train_data[y].mean()
+        spread_stat = train_data[y].max() - train_data[y].min() if sample_size > 14 else train_data[y].std()
+        drift_ucl,drift_lcl = mean*(1 + sensitivity),mean*(1 - sensitivity)
+
+        set_line_plot(ax=ax,df=df,y=f"{y}_mean",x=x,color=get_darker_color(CONFIG['Chart']['data_colors'][0],40),opacity=1,max_x_labels=MAX_LABELS)
+        ax.plot(train_data[x],train_data[y], color=CONFIG['Chart']['data_colors'][0], alpha=0.3, linewidth=1, label='Train Data')
+        ax.plot(test_data[x],test_data[y], color=CONFIG['Chart']['data_colors'][0], alpha=0.5, linewidth=1, label='Test Data')
+        set_line_plot(ax=ax,df=df[df[f"{y}_mean"] > drift_ucl],y=f"{y}_mean",x=x,color='red',opacity=1)
+        ax.hlines(y=drift_ucl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='UCL (3σ)', linewidth=1)
+        ax.hlines(y=drift_lcl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='LCL (3σ)', linewidth=1)
+        set_axis_style(ax=ax,y_label=f"{y} Drift Detection")
+        ax.legend(loc='center left', bbox_to_anchor=(1.02, 1),frameon=False)
+
+    def set_stability_plot(ax,df:pd.DataFrame,y:str,x:str,sample_size:int=20,training_size:float=0.7):
+        MAX_LABELS = 7
+        POINT_SIZE = 8 if len(df) > 1000 else 11 if len(df) > 200 else 15
+        spread_stat = 'std' if sample_size > 14 else 'range'
+
+        train_data = df.iloc[:int(len(df)*training_size)]
+        test_data = df.iloc[int(len(df)*training_size):]
+        mean, std, rang = train_data[f"{y}_{spread_stat}"].mean(), train_data[f"{y}_{spread_stat}"].std(), train_data[f"{y}_{spread_stat}"].max() - train_data[f"{y}_{spread_stat}"].min()
         ucl = mean + 3*(std if spread_stat=='std' else rang)  # d4 for n=2 is 3.267, for n=3 is 2.574, for n=4 is 2.282, for n=5 is 2.114, for n=6 is 2.004, for n=7 is 1.924, for n=8 is 1.864, for n=9 is 1.816, for n=10 is 1.777
+        
+        ax.plot(train_data[x],train_data["delta_to_rolling_mean"], color=CONFIG['Chart']['data_colors'][0], alpha=0.3, linewidth=1, label='Train Data')
+        ax.plot(test_data[x],test_data[f"delta_to_rolling_mean"], color=CONFIG['Chart']['data_colors'][0], alpha=0.5, linewidth=1, label='Test Data')   
+        
         ax.hlines(y=mean, xmin=min(df[x]), xmax=max(df[x]), colors='green', linestyles='--', label='Target', linewidth=1)
         ax.hlines(y=ucl, xmin=min(df[x]), xmax=max(df[x]), colors='red', linestyles='--', label='UCL', linewidth=1)
         set_axis_style(ax=ax,y_label=f"{y}  {'Std Dev' if spread_stat == 'std' else 'Range'}")
@@ -2336,14 +2357,16 @@ def get_process_ctrl_analysis(dt:DataTable=None,df:str=None,y:str=None,x:str=Non
         mean, std = train_data.mean(), train_data.std()
         ucl, lcl = mean + 3*std, mean - 3*std 
         data[f"{y}_mean"] = data[y].rolling(window=sample_size).mean()
+        data["delta_to_rolling_mean"] = data[y] - data[f"{y}_mean"]
         data[f"{y}_std"] = data[y].rolling(window=sample_size).std()
+        data[f"{y}_std_mean"] = data[f"{y}_std"].rolling(window=sample_size*int(data.shape[0]/sample_size)).mean() # rolling std average
         data[f"{y}_max"] = data[y].rolling(window=sample_size).max()
         data[f"{y}_min"] = data[y].rolling(window=sample_size).min()
         data[f"{y}_range"] = data[f"{y}_max"] - data[f"{y}_min"]
         data['ooc'] = (data[y] > ucl) | (data[y] < lcl)
 
         set_x_plot(ax=ax[0],df=data,y=y,x=x,sample_size=sample_size,training_size=training_size,target=target) # x chart
-        set_r_plot(ax=ax[1],df=data,y=y,x=x,sample_size=sample_size,training_size=training_size) # r chart
+        set_drift_chart(ax=ax[1],df=data,y=y,x=x,sample_size=sample_size,training_size=training_size,sensitivity=sensitivity) # drift chart
 
         # summary table
         target = target if target not in [None,'none','None'] else mean

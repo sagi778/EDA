@@ -702,7 +702,7 @@ class DataViewer(QWidget):
                 border-top: 0px;
                 border-right: 0px;
                 border-color: {CONFIG['DataViewer']['border']};
-                background-color: {CONFIG['DataViewer']['hover-color']};
+                background-color: {get_darker_color(CONFIG['DataViewer']['hover-color'],5)};
             }}
             QScrollArea {{
                 border: none;
@@ -756,7 +756,6 @@ class DataViewer(QWidget):
         self.preview_main.setLayout(self.preview_main_layout)
         self.tabs.addTab(self.preview_main, QIcon(f'{CURRENT_PATH}/icons/preview.png'), "Preview")
         self.preview_comb = QComboBox()
-        #self.preview_comb.setFixedWidth(500)
         self.preview_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.preview_comb.currentIndexChanged.connect(self.switch_preview_layout)
         self.preview_main_layout.addWidget(self.preview_comb)
@@ -764,6 +763,22 @@ class DataViewer(QWidget):
         self.preview_stack_layout = QStackedLayout()
         self.preview_stack.setLayout(self.preview_stack_layout)
         self.preview_main_layout.addWidget(self.preview_stack)
+
+        # Edit
+        self.edit_main = QWidget()
+        self.edit_main_layout = QVBoxLayout()
+        self.edit_main_layout.setAlignment(Qt.AlignTop)
+        self.edit_main_layout.setSpacing(1)
+        self.edit_main.setLayout(self.edit_main_layout)
+        self.tabs.addTab(self.edit_main, QIcon(f'{CURRENT_PATH}/icons/edit.png'), "Edit")
+        self.edit_comb = QComboBox()
+        self.edit_comb.setStyleSheet(DATA_COMBO_STYLE)
+        self.edit_comb.currentIndexChanged.connect(self.switch_edit_layout)
+        self.edit_main_layout.addWidget(self.edit_comb)
+        self.edit_stack = QWidget()
+        self.edit_stack_layout = QStackedLayout()
+        self.edit_stack.setLayout(self.edit_stack_layout)
+        self.edit_main_layout.addWidget(self.edit_stack)
 
         # SQL
         self.sql_main = QWidget()
@@ -773,7 +788,6 @@ class DataViewer(QWidget):
         self.sql_main.setLayout(self.sql_main_layout)
         self.tabs.addTab(self.sql_main, QIcon(f'{CURRENT_PATH}/icons/sql.png'), "SQL")
         self.sql_comb = QComboBox()
-        #self.sql_comb.setFixedWidth(500)
         self.sql_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.sql_comb.currentIndexChanged.connect(self.switch_sql_layout)
         self.sql_main_layout.addWidget(self.sql_comb)
@@ -790,7 +804,6 @@ class DataViewer(QWidget):
         self.plots_main.setLayout(self.plots_main_layout)
         self.tabs.addTab(self.plots_main, QIcon(f'{CURRENT_PATH}/icons/plots.png'), "Plots")
         self.plots_comb = QComboBox()
-        #self.plots_comb.setFixedWidth(500)
         self.plots_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.plots_comb.currentIndexChanged.connect(self.switch_plots_layout)
         self.plots_main_layout.addWidget(self.plots_comb)
@@ -807,7 +820,6 @@ class DataViewer(QWidget):
         self.analysis_main.setLayout(self.analysis_main_layout)
         self.tabs.addTab(self.analysis_main, QIcon(f'{CURRENT_PATH}/icons/analysis.png'), "Analysis")
         self.analysis_comb = QComboBox()
-        #self.analysis_comb.setFixedWidth(500)
         self.analysis_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.analysis_comb.currentIndexChanged.connect(self.switch_analysis_layout)
         self.analysis_main_layout.addWidget(self.analysis_comb)
@@ -824,7 +836,6 @@ class DataViewer(QWidget):
         self.time_main.setLayout(self.time_main_layout)
         self.tabs.addTab(self.time_main, QIcon(f'{CURRENT_PATH}/icons/time.png'), "Time")
         self.time_comb = QComboBox()
-        #self.analysis_comb.setFixedWidth(500)
         self.time_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.time_comb.currentIndexChanged.connect(self.switch_time_layout)
         self.time_main_layout.addWidget(self.time_comb)
@@ -852,6 +863,8 @@ class DataViewer(QWidget):
 
     def switch_preview_layout(self, index):
         self.preview_stack_layout.setCurrentIndex(index)
+    def switch_edit_layout(self, index):
+        self.edit_stack_layout.setCurrentIndex(index)    
     def switch_sql_layout(self, index):
         self.sql_stack_layout.setCurrentIndex(index)     
     def switch_plots_layout(self, index):
@@ -1005,6 +1018,7 @@ class FileExplorer(QWidget):
                 color: {CONFIG['FileExplorer']['color']};
                 background-color: white;
                 border-radius: 5px;
+
                 padding: 2px;
             }}
             QTreeView {{
