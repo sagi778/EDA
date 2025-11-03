@@ -8,7 +8,8 @@
         "get_categorical_desc(df='df',show='all',outliers=0,output_type='table',new_df=None)"
     ],
     "SQL":[
-        "get_data(df='df',output_type='table',show=100,query='SELECT * FROM df',new_df=None)"
+        "get_data(df='df',output_type='table',show=100,query='SELECT * FROM df',new_df=None)",
+        "get_gpt_data(df='df',request='show example of the data',new_df=None)"
     ],
     "Plots":[
         "get_pie_plot(df='df',y=None,stat='percent')",

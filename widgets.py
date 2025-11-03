@@ -14,7 +14,8 @@ class CodeLine(QWidget):
     def __init__(self,text:str='CodeLine'):
         super().__init__()
         self.setObjectName("CodeLine")
-        
+        ICON_SIZE = 20
+
         self._text = text
         self._current_args = None 
 
@@ -26,15 +27,10 @@ class CodeLine(QWidget):
         BUTTON_STYLE = f"""
             QPushButton {{
                 background-color: {CONFIG["Controls"]["background-color"]}; 
-                padding: 8px; 
-                width: 15px;
-                min-width: 15px;
-                max-width: 15px;
-                height: 15px;
-                min-height: 15px;
-                max-height: 15px;
-                border-radius: 15px;
-                border: 1;
+                padding: {ICON_SIZE/4}px;
+                width: {ICON_SIZE}px;
+                height: {ICON_SIZE}px;
+                border-radius: {ICON_SIZE/2}px;
             }}
             QPushButton:hover {{
                 background-color: {CONFIG["Controls"]["hover-color"]};
@@ -43,6 +39,7 @@ class CodeLine(QWidget):
             """
         self.play = QPushButton('', self)
         self.play.setIcon(QIcon(f'{CURRENT_PATH}/icons/play.png'))
+        self.play.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.play.setStyleSheet(BUTTON_STYLE)
         self.play.clicked.connect(self.run_command)
         layout.addWidget(self.play)
@@ -110,95 +107,149 @@ class CodeLine(QWidget):
         #print(f"matches = {matches}") # monitor
     
         return {item[0]:item[1] for item in matches}
+
 class CodeControls(QWidget):
     def __init__(self):
         super().__init__()
         self.setObjectName("CodeControls")
-
-        ICON_SIZE = 32
-
-        left_layout = QHBoxLayout()
-        left_layout.setAlignment(Qt.AlignLeft)
-        left_layout.setSpacing(1)
-
-        right_layout = QHBoxLayout()
-        right_layout.setAlignment(Qt.AlignRight)
-        right_layout.setSpacing(1)
+        ICON_SIZE = 20
+        ICON_STYLE = "minimal" # ['minimal']
 
         layout = QHBoxLayout()
-        layout.addLayout(left_layout)
-        layout.addLayout(right_layout)
 
         BUTTON_STYLE = f"""
             QPushButton {{
                 background-color: {CONFIG["Controls"]["background-color"]}; 
-                padding: 6px; 
-                width: 20px;
-                min-width: 20px;
-                max-width: 20px;
-                border-radius: {CONFIG["Controls"]["border-radius"]};
-                border: {CONFIG["Controls"]["border"]};
+                padding: {ICON_SIZE/10}px;
+                width: {ICON_SIZE}px;
+                height: {ICON_SIZE}px;
+                border-radius: {ICON_SIZE/2}px;
             }}
             QPushButton:hover {{
                 background-color: {CONFIG["Controls"]["hover-color"]};
                 border-color: {CONFIG["Controls"]["hover-color"]}
             }}
-        """
-        # left side buttons    
+            """
+        
         self.up = QPushButton('', self)
-        self.up.setIcon(QIcon(f'{CURRENT_PATH}/icons/arrow-up.png'))
+        self.up.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/up.png'))
+        self.up.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.up.setStyleSheet(BUTTON_STYLE)
         self.up.clicked.connect(self.set_up)
-        left_layout.addWidget(self.up)
+        layout.addWidget(self.up)
 
         self.down = QPushButton('', self)
-        self.down.setIcon(QIcon(f'{CURRENT_PATH}/icons/arrow-down.png'))
+        self.down.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/down.png'))
+        self.down.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.down.setStyleSheet(BUTTON_STYLE)
         self.down.clicked.connect(self.set_down)
-        left_layout.addWidget(self.down)
+        layout.addWidget(self.down)
 
         self.pin = QPushButton('', self)
-        self.pin.setIcon(QIcon(f'{CURRENT_PATH}/icons/thumbtack.png'))
+        self.pin.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/pin.png'))
+        self.pin.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.pin.setStyleSheet(BUTTON_STYLE)
         self.pin.clicked.connect(self.set_pin)
-        left_layout.addWidget(self.pin)
+        layout.addWidget(self.pin)
 
         self.add = QPushButton('', self)
-        self.add.setIcon(QIcon(f'{CURRENT_PATH}/icons/add.png'))
+        self.add.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/add.png'))
+        self.add.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.add.setStyleSheet(BUTTON_STYLE)
         self.add.clicked.connect(self.set_add)
-        left_layout.addWidget(self.add)
-
-        # right side buttons
-        self.pic = QPushButton('', self)
-        self.pic.setIcon(QIcon(f'{CURRENT_PATH}/icons/pic.png'))
-        self.pic.setStyleSheet(BUTTON_STYLE)
-        self.pic.clicked.connect(self.set_picture)
-        right_layout.addWidget(self.pic)
-
-        self.comment = QPushButton('', self)
-        self.comment.setIcon(QIcon(f'{CURRENT_PATH}/icons/comment.png'))
-        self.comment.setStyleSheet(BUTTON_STYLE)
-        self.comment.clicked.connect(self.set_comment)
-        right_layout.addWidget(self.comment)
+        layout.addWidget(self.add)
 
         self.trash = QPushButton('', self)
-        self.trash.setIcon(QIcon(f'{CURRENT_PATH}/icons/trash.png'))
+        self.trash.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/trash.png'))
+        self.trash.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.trash.setStyleSheet(BUTTON_STYLE)
         self.trash.clicked.connect(self.set_delete)
-        right_layout.addWidget(self.trash)
+        layout.addWidget(self.trash)
 
         self.save = QPushButton('', self)
-        self.save.setIcon(QIcon(f'{CURRENT_PATH}/icons/save.png'))
+        self.save.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/save.png'))
+        self.save.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.save.setStyleSheet(BUTTON_STYLE)
         self.save.clicked.connect(self.set_save)
-        right_layout.addWidget(self.save)
+        layout.addWidget(self.save)
 
-        self.fold = QPushButton('', self)
-        self.fold.setIcon(QIcon(f'{CURRENT_PATH}/icons/fold.png'))
-        self.fold.setStyleSheet(BUTTON_STYLE)
-        self.fold.clicked.connect(self.set_fold)
-        right_layout.addWidget(self.fold)
+        self.setLayout(layout)
+
+    def set_pin(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        layout.removeWidget(current_cmd_block)
+        layout.insertWidget(0,current_cmd_block)
+    def set_up(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        if current_index > 0:
+            layout.removeWidget(current_cmd_block)
+            layout.insertWidget(current_index - 1, current_cmd_block)
+    def set_down(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        if current_index < layout.count() - 1:
+            layout.removeWidget(current_cmd_block)
+            layout.insertWidget(current_index + 1, current_cmd_block)
+    def set_add(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        layout.insertWidget(current_index + 1, CommandBlock(cmd=current_cmd_block._cmd))        
+    def set_delete(self):
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        current_index = layout.indexOf(current_cmd_block)
+        layout.removeWidget(current_cmd_block)
+        current_cmd_block.deleteLater()
+    def set_save(self): 
+        current_cmd_block = self.parent().parent()
+        layout = current_cmd_block.parent().layout()
+        data_viewer = current_cmd_block.parent().parent().parent().parent().parent().parent().parent().parent()
+        story_layout = data_viewer.story_tab_layout
+        story_layout.addWidget(current_cmd_block)
+        story_layout.update()
+        layout.update()
+              
+class OutputControls(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("CodeControls")
+        ICON_SIZE = 20
+        ICON_STYLE = "minimal" # ['minimal']
+
+        layout = QHBoxLayout()
+
+        BUTTON_STYLE = f"""
+            QPushButton {{
+                background-color: {CONFIG["Controls"]["background-color"]}; 
+                padding: {ICON_SIZE/4}px;
+                width: {ICON_SIZE}px;
+                height: {ICON_SIZE}px;
+                border-radius: {ICON_SIZE/2}px;
+            }}
+            QPushButton:hover {{
+                background-color: {CONFIG["Controls"]["hover-color"]};
+                border-color: {CONFIG["Controls"]["hover-color"]}
+            }}
+            """
+        
+        self.pic = QPushButton('', self)
+        self.pic.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/pic.png'))
+        self.pic.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+        self.pic.setStyleSheet(BUTTON_STYLE)
+        self.pic.clicked.connect(self.set_picture)
+        layout.addWidget(self.pic)
+
+        self.comment = QPushButton('', self)
+        self.comment.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/comment.png'))
+        self.comment.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+        self.comment.setStyleSheet(BUTTON_STYLE)
+        self.comment.clicked.connect(self.set_comment)
+        layout.addWidget(self.comment)
 
         self.setLayout(layout)
 
@@ -562,7 +613,7 @@ class Comment(QWidget):
 
 # advanced widgets
 class CommandBlock(QWidget):
-    def __init__(self,dt:DataTable=pd.DataFrame(),cmd:str=''):
+    def __init__(self, dt: DataTable = pd.DataFrame(), cmd: str = ''):
         super().__init__()
         self.setObjectName("CommandBlock")
         
@@ -570,41 +621,43 @@ class CommandBlock(QWidget):
         self._cmd = cmd
         self._args = None
         self._output = None
-        self._args = None
         self._folded_items = []
 
-        # frame
-        self.block = QFrame(self)
+        # --- Main layout for the *entire* CommandBlock widget ---
+        # This layout will hold the white frame.
+        # We pass 'self' to set this as the main layout for CommandBlock
+        container_layout = QVBoxLayout(self)
+
+        # --- White Block Frame ---
+        # Create the frame. The container_layout will manage it.
+        self.block = QFrame() 
         self.block.setFrameShape(QFrame.StyledPanel)
         self.block.setFrameShadow(QFrame.Raised)
         self.block.setStyleSheet(f"""
-            QFrame {{
+            QFrame#CommandBlock_Frame {{ /* Use an object name for specificity */
                 background-color: white;
                 border: 1px solid #dedede;
-                border-radius: 15px;
+                border-radius: 5px;
             }}
             """)
-        self.set_block_size(w=1200,h=120)
+        # Give the frame an object name so the stylesheet is specific
+        self.block.setObjectName("CommandBlock_Frame") 
+        self.block.setFixedSize(1400, 80)
         
-        # Create layout
-        self.layout = QVBoxLayout(self.block)
+        self.layout = QVBoxLayout() 
+        self.code_layout = QHBoxLayout()
+        self.code_layout.addWidget(CodeLine(text=self._cmd)) 
+        self.code_layout.addWidget(CodeControls())
         
-        # Add sub-widgets
-        self.code_controls = CodeControls()
-        self.layout.addWidget(self.code_controls)
+        # Add the code layout to the block's internal layout
+        self.layout.addLayout(self.code_layout)
+        
+        # Set the internal layout *on* the white block
+        self.block.setLayout(self.layout)
 
-        self.code_line = CodeLine(self._cmd)
-        self.layout.addWidget(self.code_line)
-        
-        # Main layout
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setAlignment(Qt.AlignTop)
-        self.main_layout.setSpacing(0)
-        self.layout.setAlignment(Qt.AlignTop)
-        self.layout.setSpacing(0)
-        self.main_layout.addWidget(self.block)
-        
-        self.setLayout(self.main_layout)
+        # Add the white block (which now contains all content)
+        # to the main container_layout
+        container_layout.addWidget(self.block)
     
     def get_attributes(self):
         return {'self._cmd':f"{self._cmd}",'self._args':f"{self._args}",'self._output':f"{self._output}"} 
@@ -632,6 +685,11 @@ class CommandBlock(QWidget):
 
             self._args = ArgsMenu(args=output_obj['args'],cmd_block=self)
             self.layout.addWidget(self._args)
+            self.block.setFixedSize(self.block.width(),self.block.height() + self._args.height())
+
+            self.output_controls = OutputControls() ##
+            self.layout.addWidget(self.output_controls) ##
+            self.block.setFixedSize(self.block.width(),self.block.height() + self.output_controls.height())
 
             if output_obj['output_type'] == 'text':
                 self._output = TextOutput(output_obj['output'])
@@ -653,10 +711,6 @@ class CommandBlock(QWidget):
             self._output = TextOutput(text=error)  
 
         self.layout.addWidget(self._output)
-    def set_block_size(self,h:int=120,w:int=1200):
-        self.block.setFixedWidth(w)  # fixed width
-        self.block.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)  # height expands
-        #self.block.setFixedSize(w,h)
         
     
 # data viewer
@@ -666,6 +720,7 @@ class DataViewer(QWidget):
         self.setObjectName("DataViewer")
 
         layout = QVBoxLayout()
+        ICON_STYLE = "carbon" #['colors','office','carbon']
         
         # Create tab widget
         self.tabs = QTabWidget()
@@ -702,7 +757,7 @@ class DataViewer(QWidget):
                 border-top: 0px;
                 border-right: 0px;
                 border-color: {CONFIG['DataViewer']['border']};
-                background-color: {get_darker_color(CONFIG['DataViewer']['hover-color'],5)};
+                background-color: {CONFIG['DataViewer']['hover-color']};
             }}
             QScrollArea {{
                 border: none;
@@ -746,7 +801,7 @@ class DataViewer(QWidget):
                 }}
             """
         self.tabs.setIconSize(QSize(45,45))  # Set tab icon size
-        self.tabs.setFixedWidth(1300)
+        self.tabs.setFixedWidth(1500)
         
         # Preview
         self.preview_main = QWidget()
@@ -754,7 +809,7 @@ class DataViewer(QWidget):
         self.preview_main_layout.setAlignment(Qt.AlignTop)
         self.preview_main_layout.setSpacing(1)
         self.preview_main.setLayout(self.preview_main_layout)
-        self.tabs.addTab(self.preview_main, QIcon(f'{CURRENT_PATH}/icons/preview.png'), "Preview")
+        self.tabs.addTab(self.preview_main, QIcon(f'{CURRENT_PATH}/icons/view_board/{ICON_STYLE}/preview.png'), "Preview")
         self.preview_comb = QComboBox()
         self.preview_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.preview_comb.currentIndexChanged.connect(self.switch_preview_layout)
@@ -770,7 +825,7 @@ class DataViewer(QWidget):
         self.edit_main_layout.setAlignment(Qt.AlignTop)
         self.edit_main_layout.setSpacing(1)
         self.edit_main.setLayout(self.edit_main_layout)
-        self.tabs.addTab(self.edit_main, QIcon(f'{CURRENT_PATH}/icons/edit.png'), "Edit")
+        self.tabs.addTab(self.edit_main, QIcon(f'{CURRENT_PATH}/icons/view_board/{ICON_STYLE}/edit.png'), "Edit")
         self.edit_comb = QComboBox()
         self.edit_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.edit_comb.currentIndexChanged.connect(self.switch_edit_layout)
@@ -786,7 +841,7 @@ class DataViewer(QWidget):
         self.sql_main_layout.setAlignment(Qt.AlignTop)
         self.sql_main_layout.setSpacing(1)
         self.sql_main.setLayout(self.sql_main_layout)
-        self.tabs.addTab(self.sql_main, QIcon(f'{CURRENT_PATH}/icons/sql.png'), "SQL")
+        self.tabs.addTab(self.sql_main, QIcon(f'{CURRENT_PATH}/icons/view_board/{ICON_STYLE}/sql.png'), "SQL")
         self.sql_comb = QComboBox()
         self.sql_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.sql_comb.currentIndexChanged.connect(self.switch_sql_layout)
@@ -802,7 +857,7 @@ class DataViewer(QWidget):
         self.plots_main_layout.setAlignment(Qt.AlignTop)
         self.plots_main_layout.setSpacing(1)
         self.plots_main.setLayout(self.plots_main_layout)
-        self.tabs.addTab(self.plots_main, QIcon(f'{CURRENT_PATH}/icons/plots.png'), "Plots")
+        self.tabs.addTab(self.plots_main, QIcon(f'{CURRENT_PATH}/icons/view_board/{ICON_STYLE}/plots.png'), "Plots")
         self.plots_comb = QComboBox()
         self.plots_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.plots_comb.currentIndexChanged.connect(self.switch_plots_layout)
@@ -818,7 +873,7 @@ class DataViewer(QWidget):
         self.analysis_main_layout.setAlignment(Qt.AlignTop)
         self.analysis_main_layout.setSpacing(1)
         self.analysis_main.setLayout(self.analysis_main_layout)
-        self.tabs.addTab(self.analysis_main, QIcon(f'{CURRENT_PATH}/icons/analysis.png'), "Analysis")
+        self.tabs.addTab(self.analysis_main, QIcon(f'{CURRENT_PATH}/icons/view_board/{ICON_STYLE}/analysis.png'), "Analysis")
         self.analysis_comb = QComboBox()
         self.analysis_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.analysis_comb.currentIndexChanged.connect(self.switch_analysis_layout)
@@ -834,7 +889,7 @@ class DataViewer(QWidget):
         self.time_main_layout.setAlignment(Qt.AlignTop)
         self.time_main_layout.setSpacing(1)
         self.time_main.setLayout(self.time_main_layout)
-        self.tabs.addTab(self.time_main, QIcon(f'{CURRENT_PATH}/icons/time.png'), "Time")
+        self.tabs.addTab(self.time_main, QIcon(f'{CURRENT_PATH}/icons/view_board/{ICON_STYLE}/time.png'), "Time")
         self.time_comb = QComboBox()
         self.time_comb.setStyleSheet(DATA_COMBO_STYLE)
         self.time_comb.currentIndexChanged.connect(self.switch_time_layout)
@@ -856,7 +911,7 @@ class DataViewer(QWidget):
         self.story_tab_layout.setSpacing(1)
         self.story_container.setLayout(self.story_tab_layout)
         self.story_scroll.setWidget(self.story_container)
-        self.tabs.addTab(self.story_scroll, QIcon(f'{CURRENT_PATH}/icons/story.png'), "Story")
+        self.tabs.addTab(self.story_scroll, QIcon(f'{CURRENT_PATH}/icons/view_board/{ICON_STYLE}/story.png'), "Story")
         
         layout.addWidget(self.tabs)
         self.setLayout(layout)
@@ -1018,7 +1073,6 @@ class FileExplorer(QWidget):
                 color: {CONFIG['FileExplorer']['color']};
                 background-color: white;
                 border-radius: 5px;
-
                 padding: 2px;
             }}
             QTreeView {{
@@ -1095,7 +1149,7 @@ class FileExplorer(QWidget):
         #print(self._selected_file)       
 
         file_type = self._selected_file.split('.')[-1] 
-        if file_type in ['csv','xlsx']:
+        if file_type in ['csv','xlsx','xls']:
             new_table = DataTable(file_tree=DATA_TABLE['file_tree'],path=self._selected_file)
             DATA_TABLE['tables'].append(new_table)
             table_index = len(DATA_TABLE['tables']) - 1
