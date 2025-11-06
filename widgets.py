@@ -14,7 +14,8 @@ class CodeLine(QWidget):
     def __init__(self,text:str='CodeLine'):
         super().__init__()
         self.setObjectName("CodeLine")
-        ICON_SIZE = 20
+        ICON_STYLE = "win" # ['minimal', 'macos', 'win']
+        ICON_SIZE = 15
 
         self._text = text
         self._current_args = None 
@@ -38,7 +39,7 @@ class CodeLine(QWidget):
             }}
             """
         self.play = QPushButton('', self)
-        self.play.setIcon(QIcon(f'{CURRENT_PATH}/icons/play.png'))
+        self.play.setIcon(QIcon(f'{CURRENT_PATH}/icons/command_block/{ICON_STYLE}/play.png'))
         self.play.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.play.setStyleSheet(BUTTON_STYLE)
         self.play.clicked.connect(self.run_command)
@@ -112,8 +113,8 @@ class CodeControls(QWidget):
     def __init__(self):
         super().__init__()
         self.setObjectName("CodeControls")
-        ICON_SIZE = 20
-        ICON_STYLE = "minimal" # ['minimal']
+        ICON_SIZE = 15
+        ICON_STYLE = "win" # ['minimal', 'macos', 'win']
 
         layout = QHBoxLayout()
 
@@ -217,11 +218,12 @@ class CodeControls(QWidget):
 class OutputControls(QWidget):
     def __init__(self):
         super().__init__()
-        self.setObjectName("CodeControls")
+        self.setObjectName("OutputControls")
         ICON_SIZE = 20
-        ICON_STYLE = "minimal" # ['minimal']
+        ICON_STYLE = "win" # ['minimal', 'macos', 'win']
 
         layout = QHBoxLayout()
+        layout.addStretch()  # Add stretch to push buttons to the right
 
         BUTTON_STYLE = f"""
             QPushButton {{
@@ -667,7 +669,7 @@ class CommandBlock(QWidget):
         self.block.setFixedSize(self.block.width(),self.block.height() + 50)
     def run_command(self):
         def delete_prev_output(self):
-            for item_type in [ArgsMenu,TextOutput,TableOutput,AnalysisOutput,PlotOutput]:
+            for item_type in [ArgsMenu,TextOutput,TableOutput,AnalysisOutput,PlotOutput,OutputControls]:
                 try:
                     output_widget = self.findChild(item_type)
                     output_widget.setParent(None)
@@ -685,11 +687,9 @@ class CommandBlock(QWidget):
 
             self._args = ArgsMenu(args=output_obj['args'],cmd_block=self)
             self.layout.addWidget(self._args)
-            self.block.setFixedSize(self.block.width(),self.block.height() + self._args.height())
 
             self.output_controls = OutputControls() ##
             self.layout.addWidget(self.output_controls) ##
-            self.block.setFixedSize(self.block.width(),self.block.height() + self.output_controls.height())
 
             if output_obj['output_type'] == 'text':
                 self._output = TextOutput(output_obj['output'])
@@ -704,6 +704,8 @@ class CommandBlock(QWidget):
                     table=output_obj['output']['table']
                     )  
                 #self._output.setGeometry(0,0,1000,700)    
+            
+            self.block.setFixedSize(self.block.width(),self.block.height() + self.output_controls.height() + self._args.height() + self._output.height())
         
         except Exception:
             #pass # use for full exception in vscode
@@ -720,7 +722,7 @@ class DataViewer(QWidget):
         self.setObjectName("DataViewer")
 
         layout = QVBoxLayout()
-        ICON_STYLE = "carbon" #['colors','office','carbon']
+        ICON_STYLE = "win" #['colors','office','carbon','macos','win']
         
         # Create tab widget
         self.tabs = QTabWidget()
