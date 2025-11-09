@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
 
         self.layout.addWidget(self.splitter)
         self.setCentralWidget(self.central_widget)
-        self.splitter.setSizes([400,300,1300])
+        self.splitter.setSizes([380,300,1300])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -644,7 +644,6 @@ class CommandBlock(QWidget):
             """)
         # Give the frame an object name so the stylesheet is specific
         self.block.setObjectName("CommandBlock_Frame") 
-        self.block.setFixedSize(1400, 80)
         
         self.layout = QVBoxLayout() 
         self.code_layout = QHBoxLayout()
@@ -669,7 +668,7 @@ class CommandBlock(QWidget):
         self.block.setFixedSize(self.block.width(),self.block.height() + 50)
     def run_command(self):
         def delete_prev_output(self):
-            for item_type in [ArgsMenu,TextOutput,TableOutput,AnalysisOutput,PlotOutput,OutputControls]:
+            for item_type in [ArgsMenu, TextOutput, TableOutput, AnalysisOutput, PlotOutput, OutputControls]:
                 try:
                     output_widget = self.findChild(item_type)
                     output_widget.setParent(None)
@@ -681,11 +680,11 @@ class CommandBlock(QWidget):
 
         try:
             # no threads run
-            local_vars = {'df': self._dt._df, 'dt':self._dt}
+            local_vars = {'df': self._dt._df, 'dt': self._dt}
             local_vars.update({k: getattr(func, k) for k in dir(func) if not k.startswith("_")})
             output_obj = eval(self._cmd, {}, local_vars) 
 
-            self._args = ArgsMenu(args=output_obj['args'],cmd_block=self)
+            self._args = ArgsMenu(args=output_obj['args'], cmd_block=self)
             self.layout.addWidget(self._args)
 
             self.output_controls = OutputControls() ##
@@ -703,17 +702,17 @@ class CommandBlock(QWidget):
                     log=output_obj['output']['log'],
                     table=output_obj['output']['table']
                     )  
-                #self._output.setGeometry(0,0,1000,700)    
-            
-            self.block.setFixedSize(self.block.width(),self.block.height() + self.output_controls.height() + self._args.height() + self._output.height())
-        
+                       
         except Exception:
             #pass # use for full exception in vscode
             error = traceback.format_exc()   
             self._output = TextOutput(text=error)  
 
         self.layout.addWidget(self._output)
-        
+
+        # Make the frame ("block") dynamically adapt to content size
+        self.block.adjustSize()
+        self.adjustSize()     
     
 # data viewer
 class DataViewer(QWidget):
