@@ -484,7 +484,33 @@ def get_group_by(dt:DataTable=None,df:str=None,y:str=None,by:str=None,sub_cat:st
     } 
 
 # edit
-
+def add_row(dt:DataTable=None,df:str=None,output_type:str='table',row:dict=None,new_df:str=None):
+    dt = DATA_TABLE['tables'][DATA_TABLE['current_table_index']] if dt == None else DATA_TABLE['tables'][DATA_TABLE['current_table_index']]
+    df = dt._sub_frames[df]
+    df = df.append(row,ignore_index=True)
+    if new_df not in [None,'None','none']:
+        DATA_TABLE['tables'][DATA_TABLE['current_table_index']].add_sub_frame(sub_frame_name=new_df,df=df)
+    return {
+        'output':df,
+        'output_type':'table',
+        'args':{
+            'df':{
+                'type':'category',
+                'options':[f"'{item}'" for item in dt._sub_frames.keys()],
+                'default':f"'df'"
+            },
+            'row':{
+                'type':'dict',
+                'options':[f"'{item}'" for item in df.columns],
+                'default':None
+            },
+            'new_df':{
+                'type':'text',
+                'options':['"df_add_row"'],
+                'default':'"df_add_row"'
+            }
+        }
+    }
 
 # sql
 def get_data(dt:DataTable=None,df:str=None,output_type:str='table',show='100',query:str='SELECT * FROM df',new_df:str=None):
@@ -1366,7 +1392,6 @@ def set_line_plot(ax,df:pd.DataFrame,y:str=None,x:str=None,by:str=None,color:str
         pass  
 
 # analysis 
-
 def get_feature_importance(dt:DataTable=None,df:str=None,y:str=None,trees:int=100,exclude_outliers='False'):
     def set_axis_style(ax):
         ax.set_xlabel(ax.get_xlabel() , fontsize=13, fontfamily='Consolas', color=CONFIG['Chart']['font_color'])

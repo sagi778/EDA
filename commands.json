@@ -11,6 +11,9 @@
         "get_data(df='df',output_type='table',show=100,query='SELECT * FROM df',new_df=None)",
         "get_gpt_data(df='df',request='show example of the data',new_df=None)"
     ],
+    "Edit":[
+        "add_row(df='df',row=None,new_df=None)"
+    ],
     "Plots":[
         "get_pie_plot(df='df',y=None,stat='percent')",
         "get_line_plot(df='df',y=None,x=None,by=None)",

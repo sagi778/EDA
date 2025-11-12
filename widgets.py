@@ -223,7 +223,7 @@ class OutputControls(QWidget):
         ICON_STYLE = "win" # ['minimal', 'macos', 'win']
 
         layout = QHBoxLayout()
-        layout.addStretch()  # Add stretch to push buttons to the right
+        layout.setAlignment(Qt.AlignLeft)  # Align buttons to the left
 
         BUTTON_STYLE = f"""
             QPushButton {{
@@ -647,7 +647,8 @@ class CommandBlock(QWidget):
         
         self.layout = QVBoxLayout() 
         self.code_layout = QHBoxLayout()
-        self.code_layout.addWidget(CodeLine(text=self._cmd)) 
+        self._code_line = CodeLine(text=self._cmd)
+        self.code_layout.addWidget(self._code_line) 
         self.code_layout.addWidget(CodeControls())
         
         # Add the code layout to the block's internal layout
@@ -884,7 +885,7 @@ class DataViewer(QWidget):
         self.analysis_stack.setLayout(self.analysis_stack_layout)
         self.analysis_main_layout.addWidget(self.analysis_stack)
 
-        # Analysis
+        # Timeseries Analysis
         self.time_main = QWidget()
         self.time_main_layout = QVBoxLayout()
         self.time_main_layout.setAlignment(Qt.AlignTop)
@@ -946,8 +947,23 @@ class DataViewer(QWidget):
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(content_widget)
         self.preview_stack_layout.addWidget(scroll_area)
+    def set_edit(self):
+        print('[>] Setting up Edit commands')
+        self.edit_comb.addItem(f"DataTable = {DATA_TABLE['tables'][DATA_TABLE['current_table_index']]._file_name}")
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setSpacing(0)
+
+        for cmd_string in COMMANDS['Edit']:
+            content_layout.addWidget(CommandBlock(cmd=cmd_string,dt=DATA_TABLE['tables'][DATA_TABLE['current_table_index']]))     
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(content_widget)
+        self.edit_stack_layout.addWidget(scroll_area)  
     def set_sql(self):
-        #print('[>] Setting up SQL commands')
+        print('[>] Setting up SQL commands')
         self.sql_comb.addItem(f"DataTable = {DATA_TABLE['tables'][DATA_TABLE['current_table_index']]._file_name}")
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
@@ -1140,6 +1156,7 @@ class FileExplorer(QWidget):
         def load_file_to_data_viewer(self):
             data_viewer = self.parent().parent().parent().findChild(DataViewer,None,Qt.FindChildrenRecursively) # find data_viewer
             data_viewer.set_preview()
+            data_viewer.set_edit()
             data_viewer.set_sql()
             data_viewer.set_analysis()
             data_viewer.set_plots()
